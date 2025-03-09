@@ -1,0 +1,10 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Solitaire 2024</string>
+    <string name="title_activity_main">Solitaire 2024</string>
+    <string name="package_name">com.rabbitmountain.solitaire</string>
+    <string name="custom_url_scheme">com.rabbitmountain.solitaire</string>
+    <string name="admob_app_id">ca-app-pub-4626203012465151~5811552697</string>
+    <string name="facebook_app_id">1516389039183430</string>
+<string name="facebook_client_token">462a2ea99cc18affa311a8de70fda4f4</string>
+</resources>

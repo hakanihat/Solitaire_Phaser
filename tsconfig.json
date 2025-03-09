@@ -1,0 +1,20 @@
+{
+  "compilerOptions": {
+    "module": "ESNext",
+    "target": "ESNext",
+    "lib": ["ESNext", "DOM", "scripthost"],
+    "moduleResolution": "Node10",
+    "strict": true,
+    "sourceMap": true,
+    "resolveJsonModule": true,
+    "esModuleInterop": true,
+    "types": ["vite/client", "@awesome-cordova-plugins/applovin"],     
+
+    "noEmit": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+  
+    "noImplicitReturns": true
+  },
+  "include": ["src"]
+}
