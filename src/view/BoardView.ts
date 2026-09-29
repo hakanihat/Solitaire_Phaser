@@ -1,0 +1,415 @@
+import * as Phaser from "phaser";
+import type { Board } from "../core/board";
+import { Fan, type Layout, mirrorLayout, PileKind, type PileSpec } from "../core/layout";
+import type { Rules } from "../core/Rules";
+import { CARD_ASPECT, CardView, EFFECT_PADDING_RATIO, GLOW_TEXTURE } from "./CardView";
+import { textStyle } from "./ui";
+
+export interface Area {
+  readonly x: number;
+  readonly y: number;
+  readonly width: number;
+  readonly height: number;
+}
+
+export interface RenderOptions {
+  readonly animate?: boolean;
+  /** Milliseconds between successive cards starting to move. */
+  readonly stagger?: number;
+  /** Multiplier on the default move duration (autoplay runs faster). */
+  readonly speed?: number;
+}
+
+interface Geometry {
+  readonly cardW: number;
+  readonly cardH: number;
+  readonly originX: number;
+  readonly originY: number;
+  readonly bottom: number;
+}
+
+/** Vertical spacing of fanned cards, in card heights. */
+const FACE_DOWN_STEP = 0.12;
+const FACE_UP_STEP = 0.29;
+/** Horizontal spacing of fanned waste cards, in card widths. */
+const SIDE_STEP = 0.27;
+/** Card heights kept free below the top rows for fanned columns. */
+const FAN_RESERVE = 2.7;
+
+const DEPTH_BASE = 10;
+const DEPTH_PER_LAYER = 150;
+export const DEPTH_MOVING = 8000;
+export const DEPTH_DRAGGING = 10000;
+
+/**
+ * Renders a Board. It is declarative: `render(board)` works out where every
+ * card belongs and animates only those that changed, so moves, undo, deals
+ * and autoplay all share one code path and can never disagree with the rules.
+ */
+export class BoardView {
+  public readonly cards: CardView[];
+  private readonly layout: Layout;
+  private readonly placeholders: Phaser.GameObjects.Container[] = [];
+  private readonly stockBadges = new Map<number, Phaser.GameObjects.Text>();
+  private readonly targetGlows: Phaser.GameObjects.Image[] = [];
+  private geometry!: Geometry;
+  private board: Board;
+
+  public constructor(
+    private readonly scene: Phaser.Scene,
+    private readonly rules: Rules,
+    board: Board,
+    area: Area,
+    leftHanded: boolean,
+    private readonly accent: number
+  ) {
+    this.layout = leftHanded ? mirrorLayout(rules.layout) : rules.layout;
+    this.board = board;
+    this.cards = rules.cards.map((card) => new CardView(scene, card));
+    this.resize(area);
+  }
+
+  public get cardWidth(): number {
+    return this.geometry.cardW;
+  }
+
+  public get cardHeight(): number {
+    return this.geometry.cardH;
+  }
+
+  public get current(): Board {
+    return this.board;
+  }
+
+  /** Recomputes card size and positions for a new screen area. */
+  public resize(area: Area): void {
+    const hasFans = this.layout.piles.some((pile) => pile.fan === Fan.Down);
+    const margin = area.width * 0.025;
+    const rows = this.layout.height + (hasFans ? FAN_RESERVE : 0);
+    const cardW = Math.min(
+      (area.width - margin * 2) / this.layout.width,
+      (area.height - margin) / (rows * CARD_ASPECT)
+    );
+    const cardH = cardW * CARD_ASPECT;
+    const usedHeight = this.layout.height * cardH;
+    this.geometry = {
+      cardW,
+      cardH,
+      originX: area.x + (area.width - this.layout.width * cardW) / 2,
+      originY: hasFans ? area.y + margin * 0.6 : area.y + (area.height - usedHeight) / 2,
+      bottom: area.y + area.height - margin * 0.5,
+    };
+    this.cards.forEach((card) => card.setCardSize(cardW, cardH));
+    this.drawPlaceholders();
+    void this.render(this.board, { animate: false });
+  }
+
+  /** Moves every card to where `board` says it belongs. Resolves when done. */
+  public render(board: Board, options: RenderOptions = {}): Promise<void> {
+    this.board = board;
+    const animate = options.animate ?? true;
+    const stagger = options.stagger ?? 0;
+    const speed = options.speed ?? 1;
+    const tweens: Promise<void>[] = [];
+    let moving = 0;
+
+    board.piles.forEach((pile, pileIndex) => {
+      const spec = this.layout.piles[pileIndex];
+      const positions = this.positionsFor(board, pileIndex);
+      pile.forEach((id, index) => {
+        const card = this.cards[id];
+        const target = positions[index];
+        const depth = this.depthFor(spec, index);
+        const faceUp = spec.kind !== PileKind.Stock && index >= board.hidden[pileIndex];
+        card.pile = pileIndex;
+        card.index = index;
+        const distance = Phaser.Math.Distance.Between(card.x, card.y, target.x, target.y);
+        if (!animate || distance < 0.5) {
+          if (!animate) {
+            card.settle();
+          }
+          card.setPosition(target.x, target.y).setDepth(depth);
+          card.setFaceUp(faceUp, animate);
+          return;
+        }
+        const delay = moving * stagger;
+        moving += 1;
+        tweens.push(this.tweenCard(card, target, depth, delay, speed, distance));
+        card.setFaceUp(faceUp, animate, delay + 60 * speed);
+      });
+    });
+    this.updatePlaceholders(board);
+    return Promise.all(tweens).then(() => undefined);
+  }
+
+  /** Screen centre of the card at `index` in `pile` for the current board. */
+  public cardCenter(pile: number, index: number): Phaser.Math.Vector2 {
+    return this.positionsFor(this.board, pile)[index] ?? this.pileBase(pile);
+  }
+
+  /** Where the next card placed on `pile` would sit. */
+  public dropAnchor(pile: number): Phaser.Math.Vector2 {
+    const count = this.board.piles[pile].length;
+    if (count === 0) {
+      return this.pileBase(pile);
+    }
+    const spec = this.layout.piles[pile];
+    const top = this.cardCenter(pile, count - 1);
+    if (spec.fan === Fan.Down) {
+      return new Phaser.Math.Vector2(top.x, top.y + this.geometry.cardH * FACE_UP_STEP);
+    }
+    return top;
+  }
+
+  /** Area where a dragged card counts as dropped onto `pile`. */
+  public dropZone(pile: number): Phaser.Geom.Rectangle {
+    const { cardW, cardH } = this.geometry;
+    const base = this.pileBase(pile);
+    const count = this.board.piles[pile].length;
+    const last = count > 0 ? this.cardCenter(pile, count - 1) : base;
+    const left = Math.min(base.x, last.x) - cardW / 2;
+    const top = Math.min(base.y, last.y) - cardH / 2;
+    return new Phaser.Geom.Rectangle(left, top, Math.abs(last.x - base.x) + cardW, Math.abs(last.y - base.y) + cardH);
+  }
+
+  /** Pile under a screen point (used for taps on empty piles such as the stock). */
+  public pileAt(x: number, y: number): number | undefined {
+    for (let pile = this.layout.piles.length - 1; pile >= 0; pile -= 1) {
+      if (this.dropZone(pile).contains(x, y)) {
+        return pile;
+      }
+    }
+    return undefined;
+  }
+
+  /** Stacks every card face-down at a point: the start of the deal animation. */
+  public gatherAt(point: Phaser.Math.Vector2): void {
+    this.cards.forEach((card, i) => {
+      card.setFaceUp(false, false);
+      card.settle();
+      card.setPosition(point.x, point.y).setDepth(DEPTH_BASE + i);
+    });
+  }
+
+  /** Where the deal animation starts: the stock, or just below the table. */
+  public dealOrigin(): Phaser.Math.Vector2 {
+    const stock = this.layout.piles.findIndex((spec) => spec.kind === PileKind.Stock);
+    return stock >= 0
+      ? this.pileBase(stock)
+      : new Phaser.Math.Vector2(
+          this.geometry.originX + (this.layout.width * this.geometry.cardW) / 2,
+          this.geometry.bottom + this.geometry.cardH
+        );
+  }
+
+  /** Top-most visible card under a screen point. */
+  public cardAt(x: number, y: number): CardView | undefined {
+    let best: CardView | undefined;
+    for (const card of this.cards) {
+      if (card.visible && (!best || card.depth > best.depth) && card.getBounds().contains(x, y)) {
+        best = card;
+      }
+    }
+    return best;
+  }
+
+  public cardsFrom(pile: number, index: number): CardView[] {
+    return this.board.piles[pile].slice(index).map((id) => this.cards[id]);
+  }
+
+  /** Glowing outlines on piles, e.g. legal drop targets while dragging. */
+  public showTargets(piles: readonly number[], color = this.accent): void {
+    this.clearTargets();
+    for (const pile of piles) {
+      const anchor =
+        this.board.piles[pile].length === 0
+          ? this.pileBase(pile)
+          : this.cardCenter(pile, this.board.piles[pile].length - 1);
+      const glow = this.scene.add
+        .image(anchor.x, anchor.y, GLOW_TEXTURE)
+        .setDisplaySize(this.geometry.cardW * EFFECT_PADDING_RATIO, this.geometry.cardH * EFFECT_PADDING_RATIO * 0.98)
+        .setTint(color)
+        .setDepth(DEPTH_DRAGGING - 1)
+        .setAlpha(0.2)
+        .setBlendMode(Phaser.BlendModes.ADD);
+      this.scene.tweens.add({
+        targets: glow,
+        alpha: 0.85,
+        duration: 380,
+        yoyo: true,
+        repeat: -1,
+        ease: "Sine.easeInOut",
+      });
+      this.targetGlows.push(glow);
+    }
+  }
+
+  public clearTargets(): void {
+    this.targetGlows.splice(0).forEach((glow) => glow.destroy());
+  }
+
+  /** Every pile's on-screen bounds, for the tutorial spotlight. */
+  public pileBoundsOfKind(kinds: readonly PileKind[]): Phaser.Geom.Rectangle[] {
+    return this.layout.piles.flatMap((spec, pile) => (kinds.includes(spec.kind) ? [this.dropZone(pile)] : []));
+  }
+
+  public destroy(): void {
+    this.clearTargets();
+    this.cards.forEach((card) => card.destroy());
+    this.placeholders.forEach((holder) => holder.destroy());
+    this.stockBadges.forEach((badge) => badge.destroy());
+  }
+
+  // ---------------------------------------------------------------------------
+
+  private tweenCard(
+    card: CardView,
+    target: Phaser.Math.Vector2,
+    depth: number,
+    delay: number,
+    speed: number,
+    distance: number
+  ): Promise<void> {
+    card.settle();
+    // Longer trips take a little longer, but never feel sluggish.
+    const duration = Phaser.Math.Clamp(160 + distance / (this.geometry.cardW * 0.09), 180, 380) * speed;
+    card.setDepth(DEPTH_MOVING + depth);
+    return new Promise((resolve) => {
+      this.scene.tweens.add({
+        targets: card,
+        x: target.x,
+        y: target.y,
+        delay,
+        duration,
+        ease: "Cubic.easeOut",
+        onComplete: () => {
+          card.setDepth(depth);
+          resolve();
+        },
+        onStop: () => resolve(),
+      });
+    });
+  }
+
+  private pileBase(pile: number): Phaser.Math.Vector2 {
+    const spec = this.layout.piles[pile];
+    const { cardW, cardH, originX, originY } = this.geometry;
+    return new Phaser.Math.Vector2(originX + spec.x * cardW + cardW / 2, originY + spec.y * cardH + cardH / 2);
+  }
+
+  private depthFor(spec: PileSpec, index: number): number {
+    return DEPTH_BASE + (spec.z ?? 0) * DEPTH_PER_LAYER + index;
+  }
+
+  /** Centre of every card in a pile, including fan offsets that fit the screen. */
+  private positionsFor(board: Board, pile: number): Phaser.Math.Vector2[] {
+    const spec = this.layout.piles[pile];
+    const base = this.pileBase(pile);
+    const count = board.piles[pile].length;
+    const { cardW, cardH, bottom } = this.geometry;
+    const positions: Phaser.Math.Vector2[] = [];
+
+    if (spec.fan === Fan.Down) {
+      const hidden = Math.min(board.hidden[pile], count);
+      let down = cardH * FACE_DOWN_STEP;
+      let up = cardH * FACE_UP_STEP;
+      const needed = hidden * down + Math.max(0, count - hidden - 1) * up;
+      const available = bottom - (base.y + cardH / 2);
+      if (needed > available && needed > 0) {
+        const squeeze = Math.max(available, 0) / needed;
+        down *= squeeze;
+        up *= squeeze;
+      }
+      let y = base.y;
+      for (let i = 0; i < count; i += 1) {
+        positions.push(new Phaser.Math.Vector2(base.x, y));
+        y += i < hidden ? down : up;
+      }
+      return positions;
+    }
+
+    if (spec.fan === Fan.Right || spec.fan === Fan.Left) {
+      const direction = spec.fan === Fan.Right ? 1 : -1;
+      const firstFanned = Math.max(0, count - (spec.fanLimit ?? count));
+      for (let i = 0; i < count; i += 1) {
+        positions.push(
+          new Phaser.Math.Vector2(base.x + Math.max(0, i - firstFanned) * cardW * SIDE_STEP * direction, base.y)
+        );
+      }
+      return positions;
+    }
+
+    if (spec.kind === PileKind.Stock) {
+      // A slight offset every few cards gives the stock visible thickness.
+      for (let i = 0; i < count; i += 1) {
+        const layer = Math.floor(i / 6);
+        positions.push(new Phaser.Math.Vector2(base.x - layer * cardW * 0.012, base.y - layer * cardH * 0.009));
+      }
+      return positions;
+    }
+
+    for (let i = 0; i < count; i += 1) {
+      positions.push(base.clone());
+    }
+    return positions;
+  }
+
+  private drawPlaceholders(): void {
+    this.placeholders.splice(0).forEach((holder) => holder.destroy());
+    this.stockBadges.forEach((badge) => badge.destroy());
+    this.stockBadges.clear();
+    const { cardW, cardH } = this.geometry;
+    this.layout.piles.forEach((spec, pile) => {
+      const base = this.pileBase(pile);
+      const holder = this.scene.add.container(base.x, base.y).setDepth(1);
+      if (!spec.hideWhenEmpty) {
+        const outline = this.scene.add.graphics();
+        const radius = cardW * 0.07;
+        outline.fillStyle(0x000000, 0.16).fillRoundedRect(-cardW / 2, -cardH / 2, cardW, cardH, radius);
+        outline
+          .lineStyle(Math.max(1.5, cardW * 0.025), 0xffffff, 0.28)
+          .strokeRoundedRect(-cardW / 2, -cardH / 2, cardW, cardH, radius);
+        holder.add(outline);
+        const label = this.scene.add
+          .text(
+            0,
+            0,
+            spec.placeholder ?? "",
+            textStyle(cardW * (spec.placeholder && spec.placeholder.length > 1 ? 0.3 : 0.42), 0xffffff, true)
+          )
+          .setOrigin(0.5)
+          .setAlpha(0.4);
+        holder.add(label);
+        holder.setData("label", label);
+      }
+      this.placeholders.push(holder);
+      if (spec.kind === PileKind.Stock) {
+        const badge = this.scene.add
+          .text(base.x + cardW * 0.42, base.y + cardH * 0.46, "", {
+            ...textStyle(cardW * 0.2, 0xffffff, true),
+            backgroundColor: "rgba(0,0,0,0.55)",
+            padding: { x: cardW * 0.06, y: cardW * 0.02 },
+          })
+          .setOrigin(1, 1)
+          .setDepth(DEPTH_MOVING - 1);
+        this.stockBadges.set(pile, badge);
+      }
+    });
+  }
+
+  /** Stock placeholder shows ↻ when tapping it would recycle the waste. */
+  private updatePlaceholders(board: Board): void {
+    this.layout.piles.forEach((spec, pile) => {
+      if (spec.kind !== PileKind.Stock) {
+        return;
+      }
+      const label = this.placeholders[pile]?.getData("label") as Phaser.GameObjects.Text | undefined;
+      label?.setText(board.piles[pile].length === 0 && this.rules.canDraw(board) ? "↻" : "");
+      const count = board.piles[pile].length;
+      this.stockBadges
+        .get(pile)
+        ?.setText(count > 0 ? String(count) : "")
+        .setVisible(count > 0);
+    });
+  }
+}

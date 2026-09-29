@@ -1,48 +1,43 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Solitaire JS</title>
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover"
+    />
+    <meta name="theme-color" content="#0b3d24" />
+    <title>Solitaire Collection</title>
+    <link rel="icon" type="image/png" href="./assets/img/icon_solitaire.png" />
+    <style>
+      html,
+      body {
+        margin: 0;
+        padding: 0;
+        width: 100%;
+        height: 100%;
+        overflow: hidden;
+        background: #0b3d24;
+        /* Stop the browser from scrolling or zooming while cards are dragged. */
+        touch-action: none;
+        overscroll-behavior: none;
+        -webkit-user-select: none;
+        user-select: none;
+        -webkit-tap-highlight-color: transparent;
+      }
 
-  <style>
-    html,
-    body {
-      margin: 0;
-      padding: 0;
-      height: 100%;
-      width: 100%;
-    }
+      #game-container {
+        position: fixed;
+        inset: 0;
+      }
 
-    body {
-      overflow: hidden;
-      min-height: 100%;
-      min-width: 100%;
-    }
-
-    canvas {
-      display: block;
-      margin: 0 auto;
-      image-rendering: optimizeSpeed;
-      image-rendering: -moz-crisp-edges;
-      image-rendering: -webkit-optimize-contrast;
-      image-rendering: -o-crisp-edges;
-      image-rendering: smooth;
-      -ms-interpolation-mode: nearest-neighbor;
-    }
-
-    #game-container {
-      top: 0;
-      bottom: 0;
-      left: 0;
-      right: 0;
-      position: absolute;
-      background-color: #000;
-    }
-  </style>
-</head>
-<body>
-  <div id="game-container"></div>
-  <script type="module" src="./src/main.ts"></script>
-</body>
+      canvas {
+        display: block;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="game-container"></div>
+    <script type="module" src="./src/main.ts"></script>
+  </body>
 </html>

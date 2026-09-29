@@ -1,12 +1,12 @@
-import { CapacitorConfig } from '@capacitor/cli';
+import type { CapacitorConfig } from "@capacitor/cli";
 
 const config: CapacitorConfig = {
-  appId: 'com.rabbitmountain.solitaire',
-  appName: 'mySolitaireGame',
-  webDir: 'dist',
+  appId: "com.rabbitmountain.solitaire",
+  appName: "Solitaire Collection",
+  webDir: "dist",
   server: {
-    androidScheme: 'https'
-  }
+    androidScheme: "https",
+  },
 };
 
 export default config;

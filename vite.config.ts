@@ -1,18 +1,28 @@
+/// <reference types="vitest" />
+import { defineConfig } from "vite";
 import { viteStaticCopy } from "vite-plugin-static-copy";
 
-export default {
+export default defineConfig({
   base: "./",
   build: {
     assetsInlineLimit: 0,
+    chunkSizeWarningLimit: 1600,
+    rollupOptions: {
+      output: {
+        // Keep the engine in its own long-cacheable chunk.
+        manualChunks: { phaser: ["phaser"] },
+      },
+    },
   },
   plugins: [
     viteStaticCopy({
       targets: [
-        {
-          src: "./assets",
-          dest: "./",
-        },
+        { src: "./assets/img/cards2.png", dest: "./assets/img" },
+        { src: "./assets/sfx/*", dest: "./assets/sfx" },
       ],
     }),
   ],
-};
+  test: {
+    include: ["tests/**/*.test.ts"],
+  },
+});

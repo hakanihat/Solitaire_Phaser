@@ -13,8 +13,6 @@ ext {
     androidxJunitVersion = '1.1.5'
     androidxEspressoCoreVersion = '3.5.1'
     cordovaAndroidVersion = '10.1.1'
-    playServicesAdsVersion = '22.0.0'
     androidxCoreKTXVersion = '1.10.0'
-    firebaseConfigVersion = '21.3.0'
 
 }

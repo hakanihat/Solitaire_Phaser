@@ -4,18 +4,9 @@ buildscript {
     repositories {
         google()
         mavenCentral()
-        maven { url 'https://artifacts.applovin.com/android' } // Add this line
     }
     dependencies {
-        classpath 'com.applovin:applovin-sdk:12.0.0' // Keep your existing AppLovin SDK dependency
         classpath 'com.android.tools.build:gradle:8.0.2'
-        classpath 'com.google.gms:google-services:4.4.0'
-        classpath "com.applovin.quality:AppLovinQualityServiceGradlePlugin:5.0.5" // Add this line
-
-        // Add the following lines for Install Referrer Library
-        classpath 'com.android.installreferrer:installreferrer:2.2'
-        // Add the following line for Play Services Analytics
-        classpath 'com.google.android.gms:play-services-analytics:17.0.0'
 
         // NOTE: Do not place your application dependencies here; they belong
         // in the individual module build.gradle files

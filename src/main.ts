@@ -1,32 +1,25 @@
 import * as Phaser from "phaser";
-import UIPlugin from 'phaser3-rex-plugins/templates/ui/ui-plugin.js';
+import { BootScene } from "./scenes/BootScene";
+import { GameScene } from "./scenes/GameScene";
+import { LoadingScene } from "./scenes/LoadingScene";
+import { MenuScene } from "./scenes/MenuScene";
+import { setupPlatform } from "./services/platform";
+import { DPR, trackViewport, viewportSize } from "./view/viewport";
 
-import InitState from "./InitState";
-import GameState from "./GameState";
-import PreInitState from "./PreInitState";
- 
-const config: Phaser.Types.Core.GameConfig = {
-  backgroundColor: "#fff",
-  height: screen.height * devicePixelRatio,
-  width: screen.width * devicePixelRatio+99,
-  parent: "game-container",
-  scene: [PreInitState, InitState, GameState],
+const { width, height } = viewportSize();
+
+const game = new Phaser.Game({
   type: Phaser.AUTO,
- 
-  scale: {
-    mode: Phaser.Scale.FIT,
-  },
-  plugins: {
-    scene: [
-      {
-        key: 'rexUI',
-        plugin: UIPlugin,
-        mapping: 'rexUI',
-      },
-      // Add other plugins as needed
-      
-    ],
-  },
-};
+  parent: "game-container",
+  backgroundColor: "#0b3d24",
+  width,
+  height,
+  // Render at physical resolution and scale down with CSS for crisp cards.
+  scale: { mode: Phaser.Scale.NONE, zoom: 1 / DPR },
+  render: { antialias: true, roundPixels: false },
+  input: { activePointers: 2 },
+  scene: [BootScene, MenuScene, LoadingScene, GameScene],
+});
 
-export const game = new Phaser.Game(config);
+trackViewport(game);
+void setupPlatform(game);
