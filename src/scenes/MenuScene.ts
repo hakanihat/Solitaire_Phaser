@@ -6,6 +6,7 @@ import { storage } from "../services/storage";
 import { VARIANTS } from "../variants";
 import { cardImage } from "../view/cardAtlas";
 import { frameOf } from "../view/CardView";
+import { smoothMotion } from "../view/pixelSnap";
 import { openSettings } from "../view/SettingsPanel";
 import { addAmbient } from "../view/ambient";
 import { ornateFrame } from "../view/frames";
@@ -138,11 +139,13 @@ export class MenuScene extends Phaser.Scene {
       const sprite = cardImage(this, width / 2 + (i - 1.5) * cardW * 0.42, font * 5.2, frameOf(card), cardW)
         .setOrigin(0.5, 0.9)
         .setAngle(angle);
-      this.page.add(sprite);
+      this.page.add(smoothMotion(sprite));
       this.tweens.add({
         targets: sprite,
         angle: angle * 1.25,
-        duration: 1800 + i * 150,
+        // Same tempo for every card so the fan breathes as one.
+        duration: 2200,
+        delay: i * 90,
         yoyo: true,
         repeat: -1,
         ease: "Sine.easeInOut",

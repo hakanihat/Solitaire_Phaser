@@ -1,6 +1,7 @@
 import * as Phaser from "phaser";
 import { FX } from "../scenes/keys";
 import type { CardView } from "./CardView";
+import { smoothMotion } from "./pixelSnap";
 import { EFFECT_PADDING_RATIO, GLOW_TEXTURE } from "./CardView";
 
 const DEPTH_EFFECTS = 9000;
@@ -42,11 +43,13 @@ export function ghostMove(
 ): () => void {
   const first = cards[0];
   const ghosts = cards.map((card, i) =>
-    scene.add
-      .image(card.x, card.y, card.texture.key, card.frame.name)
-      .setDisplaySize(card.displayWidth, card.displayHeight)
-      .setAlpha(0)
-      .setDepth(DEPTH_EFFECTS - 10 + i)
+    smoothMotion(
+      scene.add
+        .image(card.x, card.y, card.texture.key, card.frame.name)
+        .setDisplaySize(card.displayWidth, card.displayHeight)
+        .setAlpha(0)
+        .setDepth(DEPTH_EFFECTS - 10 + i)
+    )
   );
   const run = (): void => {
     ghosts.forEach((ghost, i) => {

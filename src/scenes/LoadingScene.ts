@@ -10,6 +10,7 @@ import { getVariant } from "../variants";
 import { cardImage } from "../view/cardAtlas";
 import { BACK_FRAME, CARD_ASPECT, frameOf } from "../view/CardView";
 import { INTROS } from "../view/intros";
+import { smoothMotion } from "../view/pixelSnap";
 import { addAmbient } from "../view/ambient";
 import { coverTable } from "../view/tablePainter";
 import { COLORS, hex, textStyle } from "../view/ui";
@@ -21,6 +22,8 @@ const HOLD_AFTER_INTRO = 900;
 /** Intro choreography timings (ms). */
 const FLY_IN = { start: 250, stagger: 90, duration: 650 };
 const FLIP_WAVE = { stagger: 70, duration: 260 };
+/** Half-period of the cards' gentle float once the intro has played. */
+const IDLE_BOB_MS = 1400;
 /** Per-frame time slice for any solving done here. */
 const SLICE_MS = 10;
 
@@ -250,7 +253,7 @@ export class LoadingScene extends Phaser.Scene {
     const landed = FLY_IN.start + slots.length * FLY_IN.stagger + FLY_IN.duration;
 
     slots.forEach((slot, i) => {
-      const card = cardImage(this, 0, height * 0.5, BACK_FRAME, cardW);
+      const card = smoothMotion(cardImage(this, 0, height * 0.5, BACK_FRAME, cardW));
       group.add(card);
       const baseScaleX = card.scaleX;
       this.tweens.add({
@@ -273,10 +276,11 @@ export class LoadingScene extends Phaser.Scene {
         onYoyo: () => card.setFrame(frameOf(faces[i % faces.length])),
         onComplete: () => {
           card.setScale(baseScaleX, card.scaleY);
+          // One shared tempo; the flip's stagger turns it into a calm wave.
           this.tweens.add({
             targets: card,
-            y: card.y - cardH * 0.05,
-            duration: 1200 + (i % 4) * 150,
+            y: card.y - cardH * 0.04,
+            duration: IDLE_BOB_MS,
             yoyo: true,
             repeat: -1,
             ease: "Sine.easeInOut",

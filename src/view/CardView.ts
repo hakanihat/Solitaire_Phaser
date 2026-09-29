@@ -1,6 +1,7 @@
 import * as Phaser from "phaser";
 import type { Card } from "../core/cards";
 import type { CardAtlas } from "./cardAtlas";
+import { smoothMotion } from "./pixelSnap";
 
 /** The original card art: 14 columns × 4 rows, back design in frame 27. */
 export const CARD_TEXTURE = "cards";
@@ -100,6 +101,8 @@ export class CardView extends Phaser.GameObjects.Sprite {
   ) {
     super(scene, 0, 0, CARD_TEXTURE, BACK_FRAME);
     scene.add.existing(this);
+    // Crisp while resting, sub-pixel smooth while travelling, lifted or tilted.
+    smoothMotion(this, () => this.liftValue > 0 || this.angle !== 0 || scene.tweens.isTweening(this));
   }
 
   // Tweened properties -------------------------------------------------------
