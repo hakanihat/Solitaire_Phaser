@@ -117,7 +117,7 @@ export const tripeaks: VariantDefinition = {
       text: "When two cards fit, pick the one that uncovers a face-down card or keeps the chain going longer.",
     },
   ],
-  theme: { table: [0x2f6fb0, 0x0e2748], accent: 0x9be7ff, pattern: "hexagons", intro: "peaks" },
+  theme: { table: [0x2f6fb0, 0x0e2748], accent: 0x9be7ff, pattern: "hexagons", ambient: "snow", intro: "peaks" },
   solver: { strategy: "best-first", verifyNodes: 200_000, hintNodes: 40_000 },
   createRules: (difficulty) => new TriPeaksRules(OPTIONS[difficulty]),
 };

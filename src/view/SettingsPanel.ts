@@ -9,6 +9,7 @@ const OPTIONS: readonly { key: keyof Settings; label: string }[] = [
   { key: "autoFoundation", label: "Auto-play safe cards home" },
   { key: "leftHanded", label: "Left-handed layout" },
   { key: "showTimer", label: "Show timer" },
+  { key: "vibration", label: "Vibration" },
 ];
 
 /** Opens the settings dialog. `onChange` fires after each toggle is saved. */

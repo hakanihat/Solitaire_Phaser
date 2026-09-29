@@ -144,7 +144,7 @@ export const scorpion: VariantDefinition = {
       highlight: [PileKind.Stock],
     },
   ],
-  theme: { table: [0x8e3b2f, 0x2e0f0b], accent: 0xffab40, pattern: "waves", intro: "grid" },
+  theme: { table: [0x8e3b2f, 0x2e0f0b], accent: 0xffab40, pattern: "waves", ambient: "embers", intro: "grid" },
   solver: { strategy: "depth-first", verifyNodes: 200_000, hintNodes: 40_000, effort: { hard: { minNodes: 500 } } },
   createRules: (difficulty) => new ScorpionRules(OPTIONS[difficulty]),
 };

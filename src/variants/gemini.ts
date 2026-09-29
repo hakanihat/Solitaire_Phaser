@@ -43,6 +43,28 @@ const STOCK = NODES.length;
 const SUN = NODES.length + 1;
 const MOON = NODES.length + 2;
 
+/** Tall screens: the Moon pyramid sits below the Sun pyramid. */
+function geminiPortraitLayout(): Layout {
+  const apex = 2 * SLOT_STEP + 0.5;
+  const upper = pyramidNodes(ROWS, apex);
+  const shift = nodesBottom(upper) + 0.25;
+  const lower = pyramidNodes(ROWS, apex, PER_PYRAMID).map((node) => ({ ...node, cy: node.cy + shift }));
+  const nodes = [...upper, ...lower];
+  const width = 4 * SLOT_STEP + 1;
+  const bottomY = nodesBottom(nodes) + 0.3;
+  const centre = width / 2 - 0.5;
+  return {
+    width,
+    height: bottomY + 1,
+    piles: [
+      ...slotSpecs(nodes),
+      pileSpec(PileKind.Stock, centre, bottomY),
+      pileSpec(PileKind.Waste, centre - COLUMN_STEP * 1.6, bottomY, { placeholder: "☀" }),
+      pileSpec(PileKind.Waste, centre + COLUMN_STEP * 1.6, bottomY, { placeholder: "☾" }),
+    ],
+  };
+}
+
 function geminiLayout(): Layout {
   const width = RIGHT_APEX + 2 * SLOT_STEP + 0.5;
   const bottomY = nodesBottom(NODES) + 0.3;
@@ -50,6 +72,7 @@ function geminiLayout(): Layout {
   return {
     width,
     height: bottomY + 1,
+    portrait: geminiPortraitLayout(),
     piles: [
       ...slotSpecs(NODES),
       pileSpec(PileKind.Stock, centre, bottomY),
@@ -130,7 +153,7 @@ export const gemini: VariantDefinition = {
       text: "Before playing, check whether the other twin could take the next card. A chain that alternates between twins can clear a whole pyramid!",
     },
   ],
-  theme: { table: [0x40307a, 0x120b2e], accent: 0xc9a8ff, pattern: "stars", intro: "twins" },
+  theme: { table: [0x40307a, 0x120b2e], accent: 0xc9a8ff, pattern: "stars", ambient: "twinkle", intro: "twins" },
   solver: { strategy: "best-first", verifyNodes: 200_000, hintNodes: 40_000 },
   createRules: (difficulty) => new GeminiRules(OPTIONS[difficulty]),
 };

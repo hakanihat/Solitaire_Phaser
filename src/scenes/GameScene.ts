@@ -7,6 +7,7 @@ import type { Rules } from "../core/Rules";
 import { chooseTapMove, movesFrom } from "../core/tapMove";
 import type { VariantDefinition } from "../core/variant";
 import { playSfx } from "../services/audio";
+import { haptic } from "../services/haptics";
 import { type Settings, storage } from "../services/storage";
 import { getVariant } from "../variants";
 import { type Area, BoardView, DEPTH_DRAGGING } from "../view/BoardView";
@@ -15,7 +16,8 @@ import { bouncingCascade, confetti, floatingText, ghostMove, glowCards, sparkle 
 import { Hud } from "../view/Hud";
 import { runSliced, wait } from "../view/scheduler";
 import { openSettings } from "../view/SettingsPanel";
-import { paintTable, pruneTables } from "../view/tablePainter";
+import { addAmbient } from "../view/ambient";
+import { coverTable } from "../view/tablePainter";
 import { TutorialOverlay } from "../view/TutorialOverlay";
 import { Button, COLORS, Modal, Toast, textStyle } from "../view/ui";
 import { uiScale } from "../view/viewport";
@@ -47,15 +49,19 @@ export class GameScene extends Phaser.Scene {
   private boardView!: BoardView;
   private hud!: Hud;
   private toast!: Toast;
-  private background!: Phaser.GameObjects.Image;
+  private background?: Phaser.GameObjects.Image;
+  private ambient?: Phaser.GameObjects.Particles.ParticleEmitter;
   private settings!: Settings;
 
   private elapsed = 0;
   private shownSecond = -1;
   private timerRunning = false;
   private won = false;
-  /** Autoplay in progress: player input is ignored until it finishes. */
+  /** Deal or auto-finish in progress: player input waits until it finishes. */
   private busy = false;
+  /** Safe auto-play runs alongside player input; the token cancels a run. */
+  private autoRunning = false;
+  private autoToken = 0;
   private drag: DragState | null = null;
   private pendingTap: PendingTap | null = null;
   private selection: { pile: number; index: number; dispose: () => void } | null = null;
@@ -87,6 +93,8 @@ export class GameScene extends Phaser.Scene {
     // Phaser reuses the scene instance between games: reset per-game state.
     this.won = false;
     this.busy = false;
+    this.autoRunning = false;
+    this.autoToken += 1;
     this.drag = null;
     this.pendingTap = null;
     this.selection = null;
@@ -103,7 +111,8 @@ export class GameScene extends Phaser.Scene {
     }
     this.timerRunning = resuming;
 
-    this.background = this.add.image(0, 0, "__DEFAULT").setOrigin(0).setDepth(-10);
+    this.background = undefined;
+    this.ambient = undefined;
     this.toast = new Toast(this);
     this.buildChrome();
     this.boardView = new BoardView(
@@ -139,10 +148,9 @@ export class GameScene extends Phaser.Scene {
   }
 
   private buildChrome(): void {
-    const { width, height } = this.scale;
-    const key = paintTable(this, this.variant.theme, this.variant.id, width, height);
-    pruneTables(this, key);
-    this.background.setTexture(key);
+    this.background = coverTable(this, this.variant.theme, this.variant.id, this.background);
+    this.ambient?.destroy();
+    this.ambient = addAmbient(this, this.variant.theme, 16 * uiScale(this));
     this.hud?.destroy();
     this.hud = new Hud(this, this.variant, this.setup.difficulty, {
       home: () => this.goToMenu(),
@@ -210,6 +218,9 @@ export class GameScene extends Phaser.Scene {
     if (!result) {
       return false;
     }
+    if (options.auto !== true) {
+      haptic("drop");
+    }
     // The clock starts with the player's first action, not with auto-play.
     this.timerRunning ||= options.auto !== true;
     playSfx(
@@ -233,23 +244,30 @@ export class GameScene extends Phaser.Scene {
   }
 
   /** Plays "safe" foundation moves automatically, if the player enabled it. */
+  /**
+   * Plays "safe" foundation moves automatically, if the player enabled it.
+   * It never blocks input: the player can keep moving cards meanwhile, and
+   * each step re-checks the current board. Undo cancels the run.
+   */
   private async runAutoMoves(): Promise<void> {
-    // One loop at a time: a quick second move must not start a rival loop.
-    if (!this.settings.autoFoundation || this.busy) {
+    if (!this.settings.autoFoundation || this.autoRunning) {
       return;
     }
-    this.busy = true;
+    this.autoRunning = true;
+    const token = this.autoToken;
     for (
       let move = this.rules.safeAutoMove(this.session.board);
-      move && !this.won;
+      move && !this.won && token === this.autoToken;
       move = this.rules.safeAutoMove(this.session.board)
     ) {
-      await wait(this, 40);
-      if (!(await this.perform(move, { auto: true, speed: 0.8 }))) {
+      await wait(this, 30);
+      if (token !== this.autoToken || !(await this.perform(move, { auto: true, speed: 0.75 }))) {
         break;
       }
     }
-    this.busy = false;
+    if (token === this.autoToken) {
+      this.autoRunning = false;
+    }
   }
 
   /** Sparkles on cards going home, points and combo pop-ups. */
@@ -300,6 +318,9 @@ export class GameScene extends Phaser.Scene {
     if (this.busy || this.won || !this.session.undo()) {
       return;
     }
+    // Stop any auto-play run so it doesn't immediately replay what was undone.
+    this.autoToken += 1;
+    this.autoRunning = false;
     this.resetTransientUi();
     playSfx(this, "place", 0.9);
     void this.boardView.render(this.session.board, { speed: 0.8 });
@@ -378,11 +399,14 @@ export class GameScene extends Phaser.Scene {
       drag.cards.forEach((card, i) => {
         card.settle();
         card.setDepth(DEPTH_DRAGGING + i);
-        card.lift(true);
+        card.setLifted(true);
       });
       this.boardView.showTargets([...drag.targets.keys()]);
     }
-    drag.cards.forEach((card, i) => card.setPosition(pointer.x + drag.offsets[i].x, pointer.y + drag.offsets[i].y));
+    drag.cards.forEach((card, i) => {
+      card.setPosition(pointer.x + drag.offsets[i].x, pointer.y + drag.offsets[i].y);
+      card.leanTowards(pointer.velocity.x / uiScale(this));
+    });
   }
 
   private onPointerUp(pointer: Phaser.Input.Pointer): void {
@@ -390,7 +414,6 @@ export class GameScene extends Phaser.Scene {
     this.drag = null;
     if (drag?.active) {
       this.boardView.clearTargets();
-      drag.cards.forEach((card) => card.lift(false));
       const move = this.dropMove(drag, pointer);
       if (move) {
         void this.perform(move);
@@ -400,6 +423,7 @@ export class GameScene extends Phaser.Scene {
           this.boardView.pileAt(pointer.x, pointer.y) !== drag.pile;
         if (overSomething) {
           playSfx(this, "invalid");
+          haptic("invalid");
         }
         void this.boardView.render(this.session.board, { speed: 0.8 });
       }
@@ -488,6 +512,7 @@ export class GameScene extends Phaser.Scene {
       void this.perform(move);
     } else {
       playSfx(this, "invalid");
+      haptic("invalid");
       this.boardView.cardsFrom(card.pile, card.index).forEach((c) => c.shake());
     }
   }
@@ -617,6 +642,7 @@ export class GameScene extends Phaser.Scene {
       moves: this.session.moves,
     });
     playSfx(this, "win");
+    haptic("win");
     const { accent, table } = this.variant.theme;
     const emitter = confetti(this, [accent, 0xffffff, table[0], 0xff6b6b, 0x4dd0e1]);
     const cards = [...this.boardView.cards].sort((a, b) => b.depth - a.depth);

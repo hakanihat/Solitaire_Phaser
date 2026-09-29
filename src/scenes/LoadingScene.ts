@@ -9,7 +9,8 @@ import { storage } from "../services/storage";
 import { getVariant } from "../variants";
 import { CARD_ASPECT, CARD_TEXTURE, BACK_FRAME, frameOf } from "../view/CardView";
 import { INTROS } from "../view/intros";
-import { paintTable, pruneTables } from "../view/tablePainter";
+import { addAmbient } from "../view/ambient";
+import { coverTable } from "../view/tablePainter";
 import { COLORS, hex, textStyle } from "../view/ui";
 import { uiScale } from "../view/viewport";
 import { type GameData, type LoadingData, SceneKey } from "./keys";
@@ -40,9 +41,8 @@ export class LoadingScene extends Phaser.Scene {
     const font = 16 * ui;
     const accent = variant.theme.accent;
 
-    const tableKey = paintTable(this, variant.theme, variant.id, width, height);
-    pruneTables(this, tableKey);
-    this.add.image(0, 0, tableKey).setOrigin(0);
+    coverTable(this, variant.theme, variant.id);
+    addAmbient(this, variant.theme, font);
     this.playIntro(variant, font);
 
     const title = this.add

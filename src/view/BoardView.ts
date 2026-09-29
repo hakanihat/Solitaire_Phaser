@@ -2,6 +2,7 @@ import * as Phaser from "phaser";
 import type { Board } from "../core/board";
 import { Fan, type Layout, mirrorLayout, PileKind, type PileSpec } from "../core/layout";
 import type { Rules } from "../core/Rules";
+import { buildCardAtlas } from "./cardAtlas";
 import { CARD_ASPECT, CardView, EFFECT_PADDING_RATIO, GLOW_TEXTURE } from "./CardView";
 import { textStyle } from "./ui";
 
@@ -30,7 +31,7 @@ interface Geometry {
 
 /** Vertical spacing of fanned cards, in card heights. */
 const FACE_DOWN_STEP = 0.12;
-const FACE_UP_STEP = 0.29;
+const FACE_UP_STEP = 0.31;
 /** Horizontal spacing of fanned waste cards, in card widths. */
 const SIDE_STEP = 0.27;
 /** Card heights kept free below the top rows for fanned columns. */
@@ -48,7 +49,8 @@ export const DEPTH_DRAGGING = 10000;
  */
 export class BoardView {
   public readonly cards: CardView[];
-  private readonly layout: Layout;
+  private readonly layouts: readonly Layout[];
+  private layout: Layout;
   private readonly placeholders: Phaser.GameObjects.Container[] = [];
   private readonly stockBadges = new Map<number, Phaser.GameObjects.Text>();
   private readonly targetGlows: Phaser.GameObjects.Image[] = [];
@@ -63,7 +65,9 @@ export class BoardView {
     leftHanded: boolean,
     private readonly accent: number
   ) {
-    this.layout = leftHanded ? mirrorLayout(rules.layout) : rules.layout;
+    const base = leftHanded ? mirrorLayout(rules.layout) : rules.layout;
+    this.layouts = base.portrait ? [base, base.portrait] : [base];
+    this.layout = base;
     this.board = board;
     this.cards = rules.cards.map((card) => new CardView(scene, card));
     this.resize(area);
@@ -83,13 +87,14 @@ export class BoardView {
 
   /** Recomputes card size and positions for a new screen area. */
   public resize(area: Area): void {
+    const margin = area.width * 0.018;
+    // Use the arrangement that gives the biggest cards on this screen.
+    const fitted = this.layouts
+      .map((layout) => ({ layout, cardW: this.fitCardWidth(layout, area, margin) }))
+      .reduce((best, next) => (next.cardW > best.cardW ? next : best));
+    this.layout = fitted.layout;
     const hasFans = this.layout.piles.some((pile) => pile.fan === Fan.Down);
-    const margin = area.width * 0.025;
-    const rows = this.layout.height + (hasFans ? FAN_RESERVE : 0);
-    const cardW = Math.min(
-      (area.width - margin * 2) / this.layout.width,
-      (area.height - margin) / (rows * CARD_ASPECT)
-    );
+    const cardW = fitted.cardW;
     const cardH = cardW * CARD_ASPECT;
     const usedHeight = this.layout.height * cardH;
     this.geometry = {
@@ -99,7 +104,8 @@ export class BoardView {
       originY: hasFans ? area.y + margin * 0.6 : area.y + (area.height - usedHeight) / 2,
       bottom: area.y + area.height - margin * 0.5,
     };
-    this.cards.forEach((card) => card.setCardSize(cardW, cardH));
+    const atlas = buildCardAtlas(this.scene, cardW, cardH);
+    this.cards.forEach((card) => card.useAtlas(atlas, cardW, cardH));
     this.drawPlaceholders();
     void this.render(this.board, { animate: false });
   }
@@ -130,6 +136,9 @@ export class BoardView {
           }
           card.setPosition(target.x, target.y).setDepth(depth);
           card.setFaceUp(faceUp, animate);
+          if (animate) {
+            card.restPose();
+          }
           return;
         }
         const delay = moving * stagger;
@@ -191,22 +200,20 @@ export class BoardView {
     });
   }
 
-  /** Where the deal animation starts: the stock, or just below the table. */
+  /** Where the deal animation starts: the stock, or the middle of the table. */
   public dealOrigin(): Phaser.Math.Vector2 {
     const stock = this.layout.piles.findIndex((spec) => spec.kind === PileKind.Stock);
+    const { originX, originY, cardW, bottom } = this.geometry;
     return stock >= 0
       ? this.pileBase(stock)
-      : new Phaser.Math.Vector2(
-          this.geometry.originX + (this.layout.width * this.geometry.cardW) / 2,
-          this.geometry.bottom + this.geometry.cardH
-        );
+      : new Phaser.Math.Vector2(originX + (this.layout.width * cardW) / 2, originY + (bottom - originY) * 0.45);
   }
 
   /** Top-most visible card under a screen point. */
   public cardAt(x: number, y: number): CardView | undefined {
     let best: CardView | undefined;
     for (const card of this.cards) {
-      if (card.visible && (!best || card.depth > best.depth) && card.getBounds().contains(x, y)) {
+      if (card.visible && (!best || card.depth > best.depth) && card.containsPoint(x, y)) {
         best = card;
       }
     }
@@ -262,6 +269,12 @@ export class BoardView {
 
   // ---------------------------------------------------------------------------
 
+  private fitCardWidth(layout: Layout, area: Area, margin: number): number {
+    const hasFans = layout.piles.some((pile) => pile.fan === Fan.Down);
+    const rows = layout.height + (hasFans ? FAN_RESERVE : 0);
+    return Math.min((area.width - margin * 2) / layout.width, (area.height - margin) / (rows * CARD_ASPECT));
+  }
+
   private tweenCard(
     card: CardView,
     target: Phaser.Math.Vector2,
@@ -271,7 +284,7 @@ export class BoardView {
     distance: number
   ): Promise<void> {
     // Longer trips take a little longer, but never feel sluggish.
-    const duration = Phaser.Math.Clamp(160 + distance / (this.geometry.cardW * 0.09), 180, 380) * speed;
+    const duration = Phaser.Math.Clamp(150 + distance / (this.geometry.cardW * 0.1), 170, 340) * speed;
     const moving = card.moveTo(target.x, target.y, { duration, delay, depth });
     card.setDepth(DEPTH_MOVING + depth);
     return moving;
@@ -351,10 +364,21 @@ export class BoardView {
       if (!spec.hideWhenEmpty) {
         const outline = this.scene.add.graphics();
         const radius = cardW * 0.07;
-        outline.fillStyle(0x000000, 0.16).fillRoundedRect(-cardW / 2, -cardH / 2, cardW, cardH, radius);
+        const inset = cardW * 0.06;
+        outline.fillStyle(0x000000, 0.2).fillRoundedRect(-cardW / 2, -cardH / 2, cardW, cardH, radius);
         outline
-          .lineStyle(Math.max(1.5, cardW * 0.025), 0xffffff, 0.28)
+          .lineStyle(Math.max(1.5, cardW * 0.022), 0xffffff, 0.26)
           .strokeRoundedRect(-cardW / 2, -cardH / 2, cardW, cardH, radius);
+        // A faint inner line, like the stitched outline printed on a playmat.
+        outline
+          .lineStyle(Math.max(1, cardW * 0.012), this.accent, 0.22)
+          .strokeRoundedRect(
+            -cardW / 2 + inset,
+            -cardH / 2 + inset,
+            cardW - inset * 2,
+            cardH - inset * 2,
+            radius * 0.6
+          );
         holder.add(outline);
         const label = this.scene.add
           .text(

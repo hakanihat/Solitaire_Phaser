@@ -164,13 +164,22 @@ const PATTERNS: Record<Pattern, PatternPainter> = {
  * Paints (or re-uses) a full-screen table texture for a theme and returns its
  * key. Layers: radial gradient → motif → vignette.
  */
+export interface TableOptions {
+  /** Round the corners (menu tiles). */
+  readonly cornerRadius?: number;
+  /** Draw the decorative inset frame with suit ornaments (full-screen tables). */
+  readonly frame?: boolean;
+}
+
+const SUIT_ORNAMENTS = ["♠", "♥", "♣", "♦"];
+
 export function paintTable(
   scene: Phaser.Scene,
   theme: VariantTheme,
   id: string,
   width: number,
   height: number,
-  cornerRadius = 0
+  options: TableOptions = {}
 ): string {
   const key = `table_${id}_${Math.round(width)}x${Math.round(height)}`;
   if (scene.textures.exists(key)) {
@@ -182,10 +191,12 @@ export function paintTable(
   }
   const ctx = texture.getContext();
   const unit = Math.min(width, height) / 90;
-  if (cornerRadius > 0) {
-    roundedClip(ctx, width, height, cornerRadius);
+  const rng = createRng(width ^ height);
+  if (options.cornerRadius) {
+    roundedClip(ctx, width, height, options.cornerRadius);
   }
 
+  // 1. Base: a soft radial gradient, lit from slightly above centre.
   const glow = ctx.createRadialGradient(
     width / 2,
     height * 0.38,
@@ -199,8 +210,27 @@ export function paintTable(
   ctx.fillStyle = glow;
   ctx.fillRect(0, 0, width, height);
 
-  PATTERNS[theme.pattern](ctx, width, height, createRng(width ^ height), unit);
+  // 2. The game's own motif, and a fine grain so large areas never look flat.
+  PATTERNS[theme.pattern](ctx, width, height, rng, unit);
+  if (theme.pattern !== "felt") {
+    PATTERNS.felt(ctx, width, height, rng, unit * 1.6);
+  }
 
+  // 3. A gentle spotlight where the cards are.
+  const spot = ctx.createRadialGradient(
+    width / 2,
+    height * 0.3,
+    0,
+    width / 2,
+    height * 0.3,
+    Math.max(width, height) * 0.55
+  );
+  spot.addColorStop(0, "rgba(255,255,255,0.07)");
+  spot.addColorStop(1, "rgba(255,255,255,0)");
+  ctx.fillStyle = spot;
+  ctx.fillRect(0, 0, width, height);
+
+  // 4. Vignette.
   const vignette = ctx.createRadialGradient(
     width / 2,
     height / 2,
@@ -210,12 +240,71 @@ export function paintTable(
     Math.hypot(width, height) * 0.6
   );
   vignette.addColorStop(0, "rgba(0,0,0,0)");
-  vignette.addColorStop(1, "rgba(0,0,0,0.38)");
+  vignette.addColorStop(1, "rgba(0,0,0,0.42)");
   ctx.fillStyle = vignette;
   ctx.fillRect(0, 0, width, height);
 
+  if (options.frame) {
+    paintFrame(ctx, width, height, unit, theme.accent);
+  }
+
   texture.refresh();
   return key;
+}
+
+/** A card-table border: a double inset line with a suit ornament in each corner. */
+function paintFrame(ctx: CanvasRenderingContext2D, w: number, h: number, unit: number, accent: number): void {
+  const inset = unit * 1.6;
+  const radius = unit * 3;
+  ctx.save();
+  ctx.lineWidth = Math.max(1, unit * 0.22);
+  ctx.strokeStyle = rgba(accent, 0.3);
+  roundedPath(ctx, inset, inset, w - inset * 2, h - inset * 2, radius);
+  ctx.stroke();
+  ctx.lineWidth = Math.max(1, unit * 0.12);
+  ctx.strokeStyle = rgba(accent, 0.16);
+  roundedPath(ctx, inset * 1.6, inset * 1.6, w - inset * 3.2, h - inset * 3.2, radius * 0.8);
+  ctx.stroke();
+  ctx.fillStyle = rgba(accent, 0.28);
+  ctx.font = `${Math.round(unit * 2.4)}px serif`;
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  const corners: [number, number][] = [
+    [inset * 2.9, inset * 2.9],
+    [w - inset * 2.9, inset * 2.9],
+    [w - inset * 2.9, h - inset * 2.9],
+    [inset * 2.9, h - inset * 2.9],
+  ];
+  corners.forEach(([x, y], i) => ctx.fillText(SUIT_ORNAMENTS[i], x, y));
+  ctx.restore();
+}
+
+function roundedPath(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, r: number): void {
+  ctx.beginPath();
+  ctx.moveTo(x + r, y);
+  ctx.arcTo(x + w, y, x + w, y + h, r);
+  ctx.arcTo(x + w, y + h, x, y + h, r);
+  ctx.arcTo(x, y + h, x, y, r);
+  ctx.arcTo(x, y, x + w, y, r);
+  ctx.closePath();
+}
+
+/**
+ * Adds (or updates) the full-screen table image for a theme. Textures are
+ * cached per exact size, so moving between the loading screen and the game,
+ * or back to a previous size, never repaints.
+ */
+export function coverTable(
+  scene: Phaser.Scene,
+  theme: VariantTheme,
+  id: string,
+  image?: Phaser.GameObjects.Image
+): Phaser.GameObjects.Image {
+  const { width, height } = scene.scale;
+  const key = paintTable(scene, theme, id, width, height, { frame: true });
+  pruneTables(scene, key);
+  const target = image ?? scene.add.image(0, 0, key).setDepth(-10);
+  return target.setTexture(key).setOrigin(0).setPosition(0, 0);
 }
 
 function roundedClip(ctx: CanvasRenderingContext2D, w: number, h: number, r: number): void {

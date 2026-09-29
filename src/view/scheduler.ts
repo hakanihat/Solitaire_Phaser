@@ -8,7 +8,7 @@ export function runSliced<T>(
   scene: Phaser.Scene,
   task: Generator<void, T>,
   onDone: (value: T) => void,
-  budgetMs = 8
+  budgetMs = 4
 ): () => void {
   let active = true;
   const stop = (): void => {

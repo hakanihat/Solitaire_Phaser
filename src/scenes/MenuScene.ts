@@ -6,7 +6,8 @@ import { storage } from "../services/storage";
 import { VARIANTS } from "../variants";
 import { CARD_ASPECT, CARD_TEXTURE, frameOf } from "../view/CardView";
 import { openSettings } from "../view/SettingsPanel";
-import { paintTable, pruneTables } from "../view/tablePainter";
+import { addAmbient } from "../view/ambient";
+import { coverTable, paintTable } from "../view/tablePainter";
 import { TutorialOverlay } from "../view/TutorialOverlay";
 import { Button, COLORS, Modal, textStyle } from "../view/ui";
 import { drawIcon } from "../view/icons";
@@ -14,7 +15,13 @@ import { uiScale } from "../view/viewport";
 import { formatTime } from "./format";
 import { type LoadingData, SceneKey } from "./keys";
 
-const LOBBY_THEME: VariantTheme = { table: [0x1d4a6b, 0x0a1826], accent: 0xffd166, pattern: "felt", intro: "fan" };
+const LOBBY_THEME: VariantTheme = {
+  table: [0x1d4a6b, 0x0a1826],
+  accent: 0xffd166,
+  pattern: "felt",
+  ambient: "motes",
+  intro: "fan",
+};
 const DECK = createCards(52);
 /** Signature cards shown on each game's tile, as [suit, rank]. */
 const TILE_CARDS: Record<string, readonly (readonly [Suit, number])[]> = {
@@ -82,12 +89,11 @@ export class MenuScene extends Phaser.Scene {
   }
 
   public create(): void {
-    const { width, height } = this.scale;
+    const { width } = this.scale;
     const ui = uiScale(this);
     const font = 16 * ui;
-    const tableKey = paintTable(this, LOBBY_THEME, "menu", width, height);
-    pruneTables(this, tableKey);
-    this.add.image(0, 0, tableKey).setOrigin(0).setScrollFactor(0);
+    coverTable(this, LOBBY_THEME, "menu");
+    addAmbient(this, LOBBY_THEME, font);
 
     this.page = this.add.container(0, 0);
     let y = this.buildHeader(font);
@@ -188,7 +194,11 @@ export class MenuScene extends Phaser.Scene {
     VARIANTS.forEach((variant, i) => {
       const x = margin + (i % columns) * (tileW + margin) + tileW / 2;
       const y = top + Math.floor(i / columns) * (tileH + margin) + tileH / 2;
-      this.page.add(this.buildTile(variant, x, y, tileW, tileH, font));
+      const tile = this.buildTile(variant, x, y, tileW, tileH, font);
+      this.page.add(tile);
+      // Tiles rise into place one after another.
+      tile.setAlpha(0).setY(y + font * 2);
+      this.tweens.add({ targets: tile, alpha: 1, y, duration: 420, delay: 80 + i * 45, ease: "Back.easeOut" });
     });
     return top + Math.ceil(VARIANTS.length / columns) * (tileH + margin);
   }
@@ -209,22 +219,30 @@ export class MenuScene extends Phaser.Scene {
       .graphics()
       .fillStyle(0x000000, 0.3)
       .fillRoundedRect(-w / 2 + 3, -h / 2 + 6, w, h, radius);
-    const face = this.add.image(0, 0, paintTable(this, variant.theme, `tile_${variant.id}`, w, h, radius));
+    const face = this.add.image(
+      0,
+      0,
+      paintTable(this, variant.theme, `tile_${variant.id}`, w, h, { cornerRadius: radius })
+    );
     const rim = this.add
       .graphics()
       .lineStyle(2, accent, 0.55)
       .strokeRoundedRect(-w / 2, -h / 2, w, h, radius);
     tile.add([shadow, face, rim]);
 
+    // A little hand of the game's signature cards, fanned from a pivot.
     const cardW = h * 0.34;
+    const pivotX = w / 2 - cardW * 1.05;
+    const pivotY = h * 0.14;
     (TILE_CARDS[variant.id] ?? []).forEach(([suit, rank], i) => {
       const card = DECK.find((c) => c.suit === suit && c.rank === rank);
       if (card) {
         tile.add(
           this.add
-            .image(w / 2 - cardW * 1.45 + i * cardW * 0.5, -h * 0.1, CARD_TEXTURE, frameOf(card))
+            .image(pivotX + (i - 1) * cardW * 0.32, pivotY, CARD_TEXTURE, frameOf(card))
             .setDisplaySize(cardW, cardW * CARD_ASPECT)
-            .setAngle((i - 1) * 12)
+            .setOrigin(0.5, 0.85)
+            .setAngle((i - 1) * 16)
         );
       }
     });

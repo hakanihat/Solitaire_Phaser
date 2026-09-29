@@ -241,7 +241,7 @@ export const meridian: VariantDefinition = {
       text: "For every suit, ask: is it easier to reach the low cards or the high cards? Dig towards whichever end is closer to the surface.",
     },
   ],
-  theme: { table: [0xe0703a, 0x4a1a3a], accent: 0xffd180, pattern: "rays", intro: "spiral" },
+  theme: { table: [0xe0703a, 0x4a1a3a], accent: 0xffd180, pattern: "rays", ambient: "embers", intro: "spiral" },
   solver: { strategy: "best-first", verifyNodes: 200_000, hintNodes: 40_000 },
   createRules: (difficulty) => new MeridianRules(CELLS[difficulty]),
 };

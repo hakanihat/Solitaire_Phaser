@@ -129,7 +129,7 @@ export class GolfRules extends Rules {
 export const golf: VariantDefinition = {
   id: "golf",
   name: "Golf",
-  tagline: "Clear the course one rank at a time",
+  tagline: "One rank up or down",
   difficulties: {
     easy: { label: "Wrap", detail: "King ↔ Ace wraps around" },
     medium: { label: "Classic", detail: "No wrapping between King and Ace" },
@@ -156,7 +156,7 @@ export const golf: VariantDefinition = {
       text: "Plan runs that go up and down (5-6-5-4) and save stock cards for when you really need them. Combos score more!",
     },
   ],
-  theme: { table: [0x7cb342, 0x2e5c14], accent: 0xfff59d, pattern: "stripes", intro: "columns" },
+  theme: { table: [0x7cb342, 0x2e5c14], accent: 0xfff59d, pattern: "stripes", ambient: "petals", intro: "columns" },
   solver: { strategy: "best-first", verifyNodes: 200_000, hintNodes: 40_000 },
   createRules: (difficulty) => new GolfRules(OPTIONS[difficulty]),
 };

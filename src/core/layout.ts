@@ -49,12 +49,18 @@ export interface Layout {
    * screen for fanned tableau cards.
    */
   readonly height: number;
+  /**
+   * Optional arrangement for tall screens. Pile indices and rules are the
+   * same; the renderer uses whichever layout gives the bigger cards.
+   */
+  readonly portrait?: Layout;
 }
 
 /** Mirrors a layout horizontally, used for the left-handed option. */
 export function mirrorLayout(layout: Layout): Layout {
   return {
     ...layout,
+    portrait: layout.portrait ? mirrorLayout(layout.portrait) : undefined,
     piles: layout.piles.map((pile) => ({
       ...pile,
       x: layout.width - pile.x - 1,

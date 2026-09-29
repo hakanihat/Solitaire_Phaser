@@ -174,7 +174,7 @@ export const yukon: VariantDefinition = {
       text: "There is no stock — everything is already on the table. Focus on uncovering face-down cards in the tall columns on the right.",
     },
   ],
-  theme: { table: [0x3b6e8f, 0x13283a], accent: 0xb3e5fc, pattern: "scales", intro: "columns" },
+  theme: { table: [0x3b6e8f, 0x13283a], accent: 0xb3e5fc, pattern: "scales", ambient: "snow", intro: "columns" },
   solver: { strategy: "best-first", verifyNodes: 200_000, hintNodes: 40_000, effort: { easy: { maxNodes: 120 } } },
   createRules: (difficulty) => new YukonRules(difficulty === "hard" ? sameSuitDown : alternateColorsDown),
 };

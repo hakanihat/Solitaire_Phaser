@@ -6,21 +6,28 @@ import { textStyle } from "./ui";
 
 const DEPTH_EFFECTS = 9000;
 
-/** Burst of sparkles, e.g. when a card reaches a foundation. */
+const sparkEmitters = new WeakMap<Phaser.Scene, Phaser.GameObjects.Particles.ParticleEmitter>();
+
+/**
+ * Burst of sparkles, e.g. when a card reaches a foundation. One emitter per
+ * scene is reused for every burst instead of creating a new one each time.
+ */
 export function sparkle(scene: Phaser.Scene, x: number, y: number, color: number, size: number): void {
-  const emitter = scene.add.particles(x, y, FX.spark, {
-    speed: { min: size * 0.6, max: size * 2.2 },
-    angle: { min: 0, max: 360 },
-    scale: { start: size / 70, end: 0 },
-    lifespan: 520,
-    quantity: 14,
-    tint: [color, 0xffffff],
-    blendMode: Phaser.BlendModes.ADD,
-    emitting: false,
-  });
-  emitter.setDepth(DEPTH_EFFECTS);
-  emitter.explode(14);
-  scene.time.delayedCall(700, () => emitter.destroy());
+  let emitter = sparkEmitters.get(scene);
+  if (!emitter || !emitter.scene) {
+    emitter = scene.add.particles(0, 0, FX.spark, {
+      speed: { min: size * 0.6, max: size * 2.2 },
+      angle: { min: 0, max: 360 },
+      scale: { start: size / 70, end: 0 },
+      lifespan: 520,
+      blendMode: Phaser.BlendModes.ADD,
+      emitting: false,
+    });
+    emitter.setDepth(DEPTH_EFFECTS);
+    sparkEmitters.set(scene, emitter);
+  }
+  emitter.setParticleTint(color);
+  emitter.explode(14, x, y);
 }
 
 /** Text that rises and fades: score gains, combo counters. */

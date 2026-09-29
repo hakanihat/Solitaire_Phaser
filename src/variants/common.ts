@@ -5,9 +5,9 @@ import { Fan, PileKind, type PileSpec } from "../core/layout";
 import type { Rules } from "../core/Rules";
 
 /** Horizontal distance between neighbouring columns, in card widths. */
-export const COLUMN_STEP = 1.12;
+export const COLUMN_STEP = 1.07;
 /** Vertical position of the tableau when there is a row of piles above it. */
-export const TABLEAU_TOP = 1.22;
+export const TABLEAU_TOP = 1.17;
 
 export const pileSpec = (kind: PileKind, x: number, y: number, extra: Partial<PileSpec> = {}): PileSpec => ({
   kind,

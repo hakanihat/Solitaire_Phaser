@@ -1,7 +1,20 @@
 import type * as Phaser from "phaser";
 
 export type IconName =
-  "undo" | "hint" | "home" | "deal" | "gear" | "help" | "play" | "magic" | "close" | "back" | "trophy";
+  | "undo"
+  | "hint"
+  | "home"
+  | "deal"
+  | "gear"
+  | "help"
+  | "play"
+  | "magic"
+  | "close"
+  | "back"
+  | "trophy"
+  | "clock"
+  | "moves"
+  | "star";
 
 type IconPainter = (g: Phaser.GameObjects.Graphics, s: number) => void;
 
@@ -70,6 +83,27 @@ const ICONS: Record<IconName, IconPainter> = {
   back(g, s) {
     g.lineBetween(s * 0.12, -s * 0.3, -s * 0.16, 0);
     g.lineBetween(-s * 0.16, 0, s * 0.12, s * 0.3);
+  },
+  clock(g, s) {
+    g.strokeCircle(0, 0, s * 0.36);
+    g.lineBetween(0, 0, 0, -s * 0.22);
+    g.lineBetween(0, 0, s * 0.16, s * 0.08);
+  },
+  moves(g, s) {
+    // A card with a motion arrow.
+    g.strokeRoundedRect(-s * 0.36, -s * 0.28, s * 0.36, s * 0.5, s * 0.05);
+    g.lineBetween(s * 0.06, 0, s * 0.38, 0);
+    g.fillTriangle(s * 0.3, -s * 0.12, s * 0.46, 0, s * 0.3, s * 0.12);
+  },
+  star(g, s) {
+    g.beginPath();
+    for (let i = 0; i < 10; i += 1) {
+      const a = -Math.PI / 2 + (i * Math.PI) / 5;
+      const r = i % 2 === 0 ? s * 0.4 : s * 0.17;
+      g.lineTo(Math.cos(a) * r, Math.sin(a) * r);
+    }
+    g.closePath();
+    g.fillPath();
   },
   trophy(g, s) {
     g.fillRoundedRect(-s * 0.24, -s * 0.36, s * 0.48, s * 0.36, { tl: 0, tr: 0, bl: s * 0.2, br: s * 0.2 });

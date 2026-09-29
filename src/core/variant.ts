@@ -20,12 +20,16 @@ export interface TutorialStep {
 export type Pattern =
   "felt" | "diamonds" | "waves" | "rays" | "hexagons" | "dots" | "stripes" | "stars" | "web" | "scales" | "bricks";
 
+/** Slow particle atmosphere drawn over the table. */
+export type Ambient = "motes" | "snow" | "bubbles" | "embers" | "sand" | "petals" | "twinkle";
+
 export interface VariantTheme {
   /** Table gradient, centre → edge. */
   readonly table: readonly [number, number];
   /** Highlight colour for buttons, glows and particles. */
   readonly accent: number;
   readonly pattern: Pattern;
+  readonly ambient: Ambient;
   /** How the loading screen arranges its cards. */
   readonly intro: "fan" | "pyramid" | "peaks" | "cascade" | "spiral" | "twins" | "grid" | "columns";
 }

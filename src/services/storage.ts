@@ -8,6 +8,8 @@ export interface Settings {
   autoFoundation: boolean;
   leftHanded: boolean;
   showTimer: boolean;
+  /** Short vibrations on moves (touch devices). */
+  vibration: boolean;
 }
 
 export interface Stats {
@@ -38,6 +40,7 @@ const DEFAULT_SETTINGS: Settings = {
   autoFoundation: true,
   leftHanded: false,
   showTimer: true,
+  vibration: true,
 };
 
 const EMPTY_STATS: Stats = {

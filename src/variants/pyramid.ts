@@ -181,7 +181,7 @@ export const pyramid: VariantDefinition = {
       text: "Look ahead: pairing the wrong 6 with a 7 can bury the card you need. Clear the lower rows early to open up choices.",
     },
   ],
-  theme: { table: [0xc98b3a, 0x5a3212], accent: 0xffe08a, pattern: "bricks", intro: "pyramid" },
+  theme: { table: [0xc98b3a, 0x5a3212], accent: 0xffe08a, pattern: "bricks", ambient: "sand", intro: "pyramid" },
   solver: { strategy: "best-first", verifyNodes: 150_000, hintNodes: 40_000 },
   createRules: (difficulty) => new PyramidRules(PASSES[difficulty]),
 };
