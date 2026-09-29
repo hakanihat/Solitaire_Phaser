@@ -2,6 +2,7 @@ import * as Phaser from "phaser";
 import { Suit } from "../core/cards";
 import { FX } from "../scenes/keys";
 import { GLOW_TEXTURE } from "./CardView";
+import { traceSuit } from "./suits";
 import { COLORS, hex, textStyle } from "./ui";
 
 /*
@@ -24,43 +25,6 @@ const SUIT_EDGE: Record<Suit, string> = {
   [Suit.Clubs]: "#6b4a00",
   [Suit.Spades]: "#6b4a00",
 };
-
-/** Traces a suit symbol centred on (0, 0) with half-size `r`. */
-function traceSuit(ctx: CanvasRenderingContext2D, suit: Suit, r: number): void {
-  ctx.beginPath();
-  switch (suit) {
-    case Suit.Hearts:
-      ctx.moveTo(0, 0.8 * r);
-      ctx.bezierCurveTo(-1.05 * r, 0.05 * r, -0.72 * r, -0.95 * r, 0, -0.38 * r);
-      ctx.bezierCurveTo(0.72 * r, -0.95 * r, 1.05 * r, 0.05 * r, 0, 0.8 * r);
-      break;
-    case Suit.Diamonds:
-      ctx.moveTo(0, -0.9 * r);
-      ctx.lineTo(0.62 * r, 0);
-      ctx.lineTo(0, 0.9 * r);
-      ctx.lineTo(-0.62 * r, 0);
-      break;
-    case Suit.Spades:
-      ctx.moveTo(0, -0.88 * r);
-      ctx.bezierCurveTo(1.05 * r, -0.1 * r, 0.72 * r, 0.78 * r, 0, 0.28 * r);
-      ctx.bezierCurveTo(-0.72 * r, 0.78 * r, -1.05 * r, -0.1 * r, 0, -0.88 * r);
-      ctx.moveTo(0, 0.2 * r);
-      ctx.lineTo(0.3 * r, 0.9 * r);
-      ctx.lineTo(-0.3 * r, 0.9 * r);
-      break;
-    case Suit.Clubs:
-      ctx.arc(0, -0.42 * r, 0.31 * r, 0, Math.PI * 2);
-      ctx.moveTo(-0.08 * r, 0.1 * r);
-      ctx.arc(-0.39 * r, 0.1 * r, 0.31 * r, 0, Math.PI * 2);
-      ctx.moveTo(0.7 * r, 0.1 * r);
-      ctx.arc(0.39 * r, 0.1 * r, 0.31 * r, 0, Math.PI * 2);
-      ctx.moveTo(0, 0);
-      ctx.lineTo(0.26 * r, 0.9 * r);
-      ctx.lineTo(-0.26 * r, 0.9 * r);
-      break;
-  }
-  ctx.closePath();
-}
 
 /**
  * One texture with the four suits as frames 0–3 (in `Suit` order), drawn as

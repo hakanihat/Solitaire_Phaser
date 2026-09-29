@@ -1,5 +1,6 @@
 import * as Phaser from "phaser";
 import { SOUND_FILES } from "../services/audio";
+import { CARD_FONT, CARD_FONT_FILE } from "../view/cardFaces";
 import { CARD_SHEET, CARD_TEXTURE, createCardEffectTextures, registerCardFrames } from "../view/CardView";
 import { createSuitTexture } from "../view/celebrations";
 import { uiScale } from "../view/viewport";
@@ -41,6 +42,8 @@ export class BootScene extends Phaser.Scene {
     });
 
     this.load.image(CARD_TEXTURE, CARD_SHEET.file);
+    // Card faces are painted with this font, so it must be ready before any atlas.
+    this.load.font(CARD_FONT, CARD_FONT_FILE, "woff2", { weight: "100 900" });
     Object.values(SOUND_FILES).forEach(({ key, file }) => this.load.audio(key, file));
   }
 

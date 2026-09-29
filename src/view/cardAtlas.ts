@@ -1,4 +1,6 @@
 import * as Phaser from "phaser";
+import type { Suit } from "../core/cards";
+import { paintCardFace } from "./cardFaces";
 import { CARD_ASPECT, CARD_SHEET, CARD_TEXTURE } from "./CardView";
 
 /** A card sheet pre-rendered at the size the cards are shown on screen. */
@@ -18,6 +20,8 @@ const recent: string[] = [];
 /** Atlas grid; 8 × 7 = 56 cells keeps the texture roughly square. */
 const COLUMNS = 8;
 const ROWS = 7;
+/** Sheet columns 0–12 are faces (A–K); column 13 holds the backs. */
+const RANKS = 13;
 
 function makeCanvas(width: number, height: number): HTMLCanvasElement {
   const canvas = document.createElement("canvas");
@@ -66,7 +70,9 @@ function downscaledSheet(sheet: HTMLImageElement | HTMLCanvasElement, targetScal
  * Renders every card face (and the back) at exactly `width` × `height`
  * pixels, each with a soft drop shadow baked in, into one texture. Cards
  * then draw 1:1 — crisp, cheap on fill-rate, and all in a single batch.
- * Frame numbers match the original sheet, so `frameOf()` works unchanged.
+ * Faces are painted as vectors (see cardFaces.ts); the back and other
+ * artwork come from the original sheet. Frame numbers match that sheet, so
+ * `frameOf()` works unchanged.
  */
 export function buildCardAtlas(scene: Phaser.Scene, cardWidth: number, cardHeight: number): CardAtlas {
   const width = Math.max(8, Math.round(cardWidth));
@@ -106,9 +112,15 @@ export function buildCardAtlas(scene: Phaser.Scene, cardWidth: number, cardHeigh
     roundedRect(ctx, x + 1, y + 1, width - 2, height - 2, radius);
     ctx.fill();
     ctx.restore();
-    const sx = (frame % CARD_SHEET.columns) * frameW * ratio;
-    const sy = Math.floor(frame / CARD_SHEET.columns) * (sheet.height / CARD_SHEET.rows) * ratio;
-    ctx.drawImage(scaled, sx, sy, frameW * ratio, (sheet.height / CARD_SHEET.rows) * ratio, x, y, width, height);
+    const column = frame % CARD_SHEET.columns;
+    const row = Math.floor(frame / CARD_SHEET.columns);
+    if (column < RANKS) {
+      paintCardFace(ctx, { suit: row as Suit, rank: column + 1 }, x, y, width, height, radius);
+    } else {
+      const sx = column * frameW * ratio;
+      const sy = row * (sheet.height / CARD_SHEET.rows) * ratio;
+      ctx.drawImage(scaled, sx, sy, frameW * ratio, (sheet.height / CARD_SHEET.rows) * ratio, x, y, width, height);
+    }
     texture.add(frame, 0, x - pad, y - pad, cellW, cellH);
   }
   texture.refresh();

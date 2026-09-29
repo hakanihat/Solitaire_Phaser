@@ -19,6 +19,7 @@ export default defineConfig({
       targets: [
         { src: "./assets/img/cards2.png", dest: "./assets/img" },
         { src: "./assets/sfx/*", dest: "./assets/sfx" },
+        { src: "./assets/fonts/*", dest: "./assets/fonts" },
       ],
     }),
   ],
