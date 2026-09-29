@@ -84,11 +84,17 @@ export class GameScene extends Phaser.Scene {
     }
     this.settings = storage.settings();
     this.elapsed = data.elapsed ?? 0;
+    // Phaser reuses the scene instance between games: reset per-game state.
     this.won = false;
     this.busy = false;
     this.drag = null;
+    this.pendingTap = null;
     this.selection = null;
+    this.hintJob = null;
+    this.planJob = null;
+    this.hintVisuals = [];
     this.finishPlan = null;
+    this.celebration = [];
 
     const resuming = (data.replay?.length ?? 0) > 0;
     data.replay?.forEach((move) => this.session.play(move));
@@ -179,11 +185,18 @@ export class GameScene extends Phaser.Scene {
     playSfx(this, "shuffle");
     void this.boardView.render(this.session.board, { stagger: this.rules.cards.length > 60 ? 12 : 22 }).then(() => {
       this.busy = false;
-      this.afterBoardChange();
-      if (!storage.tutorialSeen(this.variant.id)) {
-        this.showTutorial();
+      if (storage.tutorialSeen(this.variant.id)) {
+        void this.startPlay();
+      } else {
+        this.showTutorial(() => void this.startPlay());
       }
     });
+  }
+
+  /** Sends any obviously safe cards home straight after the deal. */
+  private async startPlay(): Promise<void> {
+    await this.runAutoMoves();
+    this.afterBoardChange();
   }
 
   // ---------------------------------------------------------------------------
@@ -197,7 +210,8 @@ export class GameScene extends Phaser.Scene {
     if (!result) {
       return false;
     }
-    this.timerRunning = true;
+    // The clock starts with the player's first action, not with auto-play.
+    this.timerRunning ||= options.auto !== true;
     playSfx(
       this,
       move.kind === "draw" && this.rules.pilesOf(PileKind.Waste).length === 0 ? "shuffle" : "place",
@@ -220,7 +234,8 @@ export class GameScene extends Phaser.Scene {
 
   /** Plays "safe" foundation moves automatically, if the player enabled it. */
   private async runAutoMoves(): Promise<void> {
-    if (!this.settings.autoFoundation) {
+    // One loop at a time: a quick second move must not start a rival loop.
+    if (!this.settings.autoFoundation || this.busy) {
       return;
     }
     this.busy = true;
@@ -428,7 +443,7 @@ export class GameScene extends Phaser.Scene {
         void this.perform({ kind: "draw" });
       } else {
         playSfx(this, "invalid");
-        this.showToast("The stock is empty.");
+        this.showToast(this.rules.drawBlockedReason(board));
       }
       return;
     }
@@ -745,7 +760,7 @@ export class GameScene extends Phaser.Scene {
     });
   }
 
-  private showTutorial(): void {
+  private showTutorial(onClose?: () => void): void {
     if (this.children.list.some((child) => child instanceof TutorialOverlay)) {
       return;
     }
@@ -753,7 +768,7 @@ export class GameScene extends Phaser.Scene {
     storage.markTutorialSeen(this.variant.id);
     new TutorialOverlay(this, this.variant, {
       spotlight: (kinds) => this.boardView.pileBoundsOfKind(kinds),
-      onClose: () => undefined,
+      onClose: () => onClose?.(),
     });
   }
 

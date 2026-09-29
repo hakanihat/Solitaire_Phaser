@@ -270,25 +270,11 @@ export class BoardView {
     speed: number,
     distance: number
   ): Promise<void> {
-    card.settle();
     // Longer trips take a little longer, but never feel sluggish.
     const duration = Phaser.Math.Clamp(160 + distance / (this.geometry.cardW * 0.09), 180, 380) * speed;
+    const moving = card.moveTo(target.x, target.y, { duration, delay, depth });
     card.setDepth(DEPTH_MOVING + depth);
-    return new Promise((resolve) => {
-      this.scene.tweens.add({
-        targets: card,
-        x: target.x,
-        y: target.y,
-        delay,
-        duration,
-        ease: "Cubic.easeOut",
-        onComplete: () => {
-          card.setDepth(depth);
-          resolve();
-        },
-        onStop: () => resolve(),
-      });
-    });
+    return moving;
   }
 
   private pileBase(pile: number): Phaser.Math.Vector2 {

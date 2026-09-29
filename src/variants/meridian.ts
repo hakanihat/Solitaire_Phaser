@@ -114,6 +114,16 @@ export class MeridianRules extends Rules {
     }
   }
 
+  /** Each column is one same-suit chain, so the suits can simply be sent home. */
+  public override canAutoFinish(board: Board): boolean {
+    return this.tableau.every((pile) => {
+      const cards = board.piles[pile].map((id) => this.cards[id]);
+      return cards.every(
+        (card, i) => i === 0 || (card.suit === cards[0].suit && Math.abs(card.rank - cards[i - 1].rank) === 1)
+      );
+    });
+  }
+
   /** How many cards of a suit are home (its Sunrise plus its Sunset pile). */
   public suitProgress(board: Board, foundation: number): number {
     const rise = foundation - (foundation % 2);

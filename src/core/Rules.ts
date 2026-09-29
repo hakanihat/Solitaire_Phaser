@@ -65,6 +65,21 @@ export abstract class Rules {
     return false;
   }
 
+  /** Explains to the player why tapping the stock does nothing right now. */
+  public drawBlockedReason(board: Board): string {
+    const stock = this.pilesOf(PileKind.Stock)[0];
+    const waste = this.pilesOf(PileKind.Waste)[0];
+    if (
+      stock !== undefined &&
+      board.piles[stock].length === 0 &&
+      waste !== undefined &&
+      board.piles[waste].length > 0
+    ) {
+      return "No more passes through the stock on this level.";
+    }
+    return "The stock is empty.";
+  }
+
   /** Performs the stock action on a board clone. */
   protected performDraw(_board: Board): void {
     // Variants without a stock never get here.
@@ -110,11 +125,16 @@ export abstract class Rules {
   }
 
   /**
-   * True when nothing is left to discover, so the solver can reliably finish
-   * the game for the player ("Auto finish").
+   * True when the game is effectively decided, so offering "Auto finish" takes
+   * nothing interesting away from the player: nothing is left face-down (the
+   * stock counts as face-down) and every column can be picked up as a whole,
+   * i.e. it is already in order. The solver must still confirm a finish.
    */
   public canAutoFinish(board: Board): boolean {
-    return board.hidden.every((hidden) => hidden === 0);
+    return (
+      board.hidden.every((hidden) => hidden === 0) &&
+      this.pilesOf(PileKind.Tableau).every((pile) => board.piles[pile].length === 0 || this.canPick(board, pile, 0))
+    );
   }
 
   /**

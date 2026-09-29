@@ -101,6 +101,11 @@ export class FreeCellRules extends Rules {
     return super.evaluate(board) - 3 * this.buriedDepth(board, (card) => card.rank === ranks[card.suit] + 1);
   }
 
+  /** Every column already in alternating-colour order: the rest is mechanical. */
+  public override canAutoFinish(board: Board): boolean {
+    return this.tableau.every((pile) => isRun(this, board, pile, 0, alternateColorsDown));
+  }
+
   public override safeAutoMove(board: Board): Move | null {
     const ranks = foundationRanks(this, board, this.foundations);
     for (const from of [...this.cells, ...this.tableau]) {

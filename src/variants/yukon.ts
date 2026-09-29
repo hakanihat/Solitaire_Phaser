@@ -3,6 +3,7 @@ import {
   type Relation,
   alternateColorsDown,
   foundationRanks,
+  isRun,
   isSafeForAlternatingColors,
   sameSuitDown,
 } from "../core/building";
@@ -85,6 +86,11 @@ export class YukonRules extends Rules {
       default:
         return false;
     }
+  }
+
+  /** Everything face-up and every column in building order. */
+  public override canAutoFinish(board: Board): boolean {
+    return this.tableau.every((pile) => board.hidden[pile] === 0 && isRun(this, board, pile, 0, this.relation));
   }
 
   private get inSuit(): boolean {

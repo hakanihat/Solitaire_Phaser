@@ -23,3 +23,8 @@ const game = new Phaser.Game({
 
 trackViewport(game);
 void setupPlatform(game);
+
+if (import.meta.env.DEV) {
+  // Handy for debugging and automated visual checks; stripped from production builds.
+  (window as unknown as { solitaire: Phaser.Game }).solitaire = game;
+}

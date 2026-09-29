@@ -1,5 +1,5 @@
 import { type Board, createBoard, transferCards } from "../core/board";
-import { sameSuitDown } from "../core/building";
+import { isRun, sameSuitDown } from "../core/building";
 import { createCards, KING } from "../core/cards";
 import { type Layout, PileKind } from "../core/layout";
 import type { Move } from "../core/moves";
@@ -81,6 +81,14 @@ export class ScorpionRules extends Rules {
       return this.options.anyToEmpty || moving.rank === KING;
     }
     return sameSuitDown(target, moving);
+  }
+
+  /** Stock dealt, everything face-up and every column a same-suit run. */
+  public override canAutoFinish(board: Board): boolean {
+    return (
+      board.piles[STOCK].length === 0 &&
+      this.tableau.every((pile) => board.hidden[pile] === 0 && isRun(this, board, pile, 0, sameSuitDown))
+    );
   }
 
   public override canDraw(board: Board): boolean {

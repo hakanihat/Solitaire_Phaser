@@ -90,6 +90,8 @@ export class CardView extends Phaser.GameObjects.Sprite {
   private baseScaleX = 1;
   private baseScaleY = 1;
   private flipping = false;
+  /** Resolves the promise of an in-flight move; see `moveTo` and `settle`. */
+  private arrival: (() => void) | null = null;
 
   public constructor(
     scene: Phaser.Scene,
@@ -112,10 +114,42 @@ export class CardView extends Phaser.GameObjects.Sprite {
    * an interrupted flip can never leave it squashed or showing the wrong face.
    */
   public settle(): void {
+    // Phaser destroys killed tweens without firing onStop/onComplete, so any
+    // caller awaiting this card's arrival must be released explicitly.
+    this.resolveArrival();
     this.scene.tweens.killTweensOf(this);
     this.flipping = false;
     this.setFrame(this.faceUp ? frameOf(this.card) : BACK_FRAME);
     this.setScale(this.baseScaleX, this.baseScaleY);
+  }
+
+  /**
+   * Glides to a point. The promise always settles: on arrival, or as soon as
+   * the motion is interrupted by another animation or `settle()`.
+   */
+  public moveTo(x: number, y: number, options: { duration: number; delay: number; depth: number }): Promise<void> {
+    this.settle();
+    return new Promise((resolve) => {
+      this.arrival = resolve;
+      this.scene.tweens.add({
+        targets: this,
+        x,
+        y,
+        delay: options.delay,
+        duration: options.duration,
+        ease: "Cubic.easeOut",
+        onComplete: () => {
+          this.setDepth(options.depth);
+          this.resolveArrival();
+        },
+      });
+    });
+  }
+
+  private resolveArrival(): void {
+    const arrival = this.arrival;
+    this.arrival = null;
+    arrival?.();
   }
 
   public setFaceUp(faceUp: boolean, animate: boolean, delay = 0): void {

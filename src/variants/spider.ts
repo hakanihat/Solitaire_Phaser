@@ -90,6 +90,10 @@ export class SpiderRules extends Rules {
     return board.piles[STOCK].length > 0 && this.tableau.every((pile) => board.piles[pile].length > 0);
   }
 
+  public override drawBlockedReason(board: Board): string {
+    return board.piles[STOCK].length > 0 ? "Every column needs a card before you can deal." : "The stock is empty.";
+  }
+
   protected override performDraw(board: Board): void {
     for (const pile of this.tableau) {
       transferCards(board, STOCK, pile, 1);

@@ -75,11 +75,6 @@ export abstract class OverlapRules extends Rules {
     return this.slots.length;
   }
 
-  /** Nothing is left to decide once the layout is face-up and the stock is empty. */
-  public override canAutoFinish(board: Board): boolean {
-    return board.hidden.every((hidden) => hidden === 0);
-  }
-
   /** Deals one card per slot and returns the rest of the shuffled deck. */
   protected dealSlots(seed: number): { board: Board; rest: number[] } {
     const board = createBoard(this.layout.piles.length);

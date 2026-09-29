@@ -78,6 +78,11 @@ export class GolfRules extends Rules {
     transferCards(board, STOCK, WASTE, 1);
   }
 
+  /** Once the stock is exhausted every remaining play is forced or not. */
+  public override canAutoFinish(board: Board): boolean {
+    return board.piles[STOCK].length === 0;
+  }
+
   public override progress(board: Board): number {
     return TABLEAU_CARDS - this.tableau.reduce((sum, pile) => sum + board.piles[pile].length, 0);
   }

@@ -131,6 +131,7 @@ export class KlondikeRules extends Rules {
     return null;
   }
 
+  /** Classic Klondike auto-complete: once every tableau card is face-up. */
   public override canAutoFinish(board: Board): boolean {
     return this.tableau.every((pile) => board.hidden[pile] === 0);
   }

@@ -6,6 +6,7 @@ import { solve } from "../src/core/solver";
 import { VARIANTS } from "../src/variants";
 import { KlondikeRules } from "../src/variants/klondike";
 import { MeridianRules } from "../src/variants/meridian";
+import { PileKind } from "../src/core/layout";
 
 const allCardIds = (board: Board): number[] => board.piles.flat().sort((a, b) => a - b);
 
@@ -100,5 +101,50 @@ describe("hint engine", () => {
     // History: two recent lost positions, then a winnable one three moves back.
     const hint = runToEnd(engine.think(lost!.board, [lost!.board, lost!.board, won!.board]));
     expect(hint).toMatchObject({ kind: "undo", steps: 3 });
+  });
+});
+
+describe("auto-finish", () => {
+  it.each(VARIANTS.map((variant) => [variant.id, variant] as const))(
+    "is not offered on a fresh %s deal",
+    (_id, variant) => {
+      DIFFICULTIES.forEach((difficulty) => {
+        const rules = variant.createRules(difficulty);
+        expect(rules.canAutoFinish(rules.deal(42))).toBe(false);
+      });
+    }
+  );
+});
+
+describe("tap to move", async () => {
+  const { chooseTapMove } = await import("../src/core/tapMove");
+  const { transfer } = await import("../src/core/moves");
+
+  it("sends a playable Ace to the foundation", () => {
+    const rules = new KlondikeRules({ draw: 1, passes: Infinity });
+    // Find a deal with a face-up Ace on the tableau.
+    for (let seed = 1; seed < 200; seed += 1) {
+      const board = rules.deal(seed);
+      const pile = rules.pilesOf(PileKind.Tableau).find((p) => rules.topCard(board, p)?.rank === 1);
+      if (pile !== undefined) {
+        const move = chooseTapMove(rules, board, pile, board.piles[pile].length - 1);
+        expect(move).toMatchObject({ kind: "move", from: pile, count: 1 });
+        expect(rules.kindOf((move as { to: number }).to)).toBe(PileKind.Foundation);
+        return;
+      }
+    }
+    throw new Error("no suitable deal found");
+  });
+
+  it("prefers the move on the known winning line", () => {
+    const rules = new KlondikeRules({ draw: 1, passes: Infinity });
+    const board = rules.deal(3);
+    const pile = rules.pilesOf(PileKind.Tableau)[6];
+    const index = board.piles[pile].length - 1;
+    const options = rules.pilesOf(PileKind.Tableau).filter((to) => rules.resolveDrop(board, pile, index, to));
+    if (options.length > 0) {
+      const preferred = transfer(pile, options[options.length - 1], 1);
+      expect(chooseTapMove(rules, board, pile, index, preferred)).toEqual(preferred);
+    }
   });
 });
