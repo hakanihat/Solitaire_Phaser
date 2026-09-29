@@ -24,6 +24,10 @@ import { uiScale } from "../view/viewport";
 import { formatTime } from "./format";
 import { type GameData, type LoadingData, SceneKey } from "./keys";
 
+/** Auto-play pacing (ms): let a reveal flip finish, then show the card before it moves. */
+const AUTO_REVEAL_PAUSE = 280;
+const AUTO_PRESENT_TIME = 420;
+
 /** Pointer travel (in card widths) before a press becomes a drag. */
 const DRAG_THRESHOLD = 0.08;
 
@@ -191,7 +195,8 @@ export class GameScene extends Phaser.Scene {
     this.busy = true;
     this.boardView.gatherAt(this.boardView.dealOrigin());
     playSfx(this, "shuffle");
-    void this.boardView.render(this.session.board, { stagger: this.rules.cards.length > 60 ? 12 : 22 }).then(() => {
+    const stagger = this.rules.cards.length > 60 ? 22 : 45;
+    void this.boardView.render(this.session.board, { stagger, speed: 1.15, dealOrder: true }).then(() => {
       this.busy = false;
       if (storage.tutorialSeen(this.variant.id)) {
         void this.startPlay();
@@ -260,14 +265,39 @@ export class GameScene extends Phaser.Scene {
       move && !this.won && token === this.autoToken;
       move = this.rules.safeAutoMove(this.session.board)
     ) {
-      await wait(this, 30);
-      if (token !== this.autoToken || !(await this.perform(move, { auto: true, speed: 0.75 }))) {
+      await wait(this, AUTO_REVEAL_PAUSE);
+      if (token !== this.autoToken || !(await this.presentAutoMove(move, token))) {
+        break;
+      }
+      if (!(await this.perform(move, { auto: true, speed: 1.1 }))) {
         break;
       }
     }
     if (token === this.autoToken) {
       this.autoRunning = false;
     }
+  }
+
+  /**
+   * Lifts the card(s) an automatic move is about to take, with a glow, so the
+   * player sees what is happening before it flies home. Returns false if the
+   * run was cancelled meanwhile (the cards settle back down).
+   */
+  private async presentAutoMove(move: Move, token: number): Promise<boolean> {
+    if (move.kind !== "move" || !this.rules.isLegal(this.session.board, move)) {
+      return move.kind !== "move";
+    }
+    const board = this.session.board;
+    const cards = this.boardView.cardsFrom(move.from, board.piles[move.from].length - move.count);
+    const dispose = glowCards(this, cards, this.variant.theme.accent);
+    cards.forEach((card) => card.present());
+    await wait(this, AUTO_PRESENT_TIME);
+    dispose();
+    const stillValid = token === this.autoToken && this.rules.isLegal(this.session.board, move);
+    if (!stillValid) {
+      cards.forEach((card) => card.restPose());
+    }
+    return stillValid;
   }
 
   /** Sparkles on cards going home, points and combo pop-ups. */

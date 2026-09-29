@@ -260,6 +260,11 @@ export class CardView extends Phaser.GameObjects.Sprite {
     this.setAngle(this.angle + (target - this.angle) * 0.35);
   }
 
+  /** Rises and stays up, to point the card out (before an automatic move). */
+  public present(): void {
+    this.scene.tweens.add({ targets: this, liftAmount: 1.3, duration: 180, ease: "Back.easeOut" });
+  }
+
   /** Brief pop used when a card lands somewhere meaningful. */
   public bump(delay = 0): void {
     this.scene.tweens.add({ targets: this, liftAmount: 0.8, duration: 90, delay, yoyo: true, ease: "Quad.easeOut" });

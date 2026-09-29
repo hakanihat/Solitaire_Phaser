@@ -15,8 +15,11 @@ import { COLORS, hex, textStyle } from "../view/ui";
 import { uiScale } from "../view/viewport";
 import { type GameData, type LoadingData, SceneKey } from "./keys";
 
-/** Long enough for the intro to read, short enough never to feel like a wait. */
-const MIN_DURATION = 1400;
+/** How long the finished intro stays on screen before the game starts. */
+const HOLD_AFTER_INTRO = 900;
+/** Intro choreography timings (ms). */
+const FLY_IN = { start: 250, stagger: 90, duration: 650 };
+const FLIP_WAVE = { stagger: 70, duration: 260 };
 /** Per-frame time slice for any solving done here. */
 const SLICE_MS = 10;
 
@@ -43,7 +46,14 @@ export class LoadingScene extends Phaser.Scene {
 
     coverTable(this, variant.theme, variant.id);
     addAmbient(this, variant.theme, font);
-    this.playIntro(variant, font);
+    this.introDone = false;
+    this.leaving = false;
+    this.gameData = null;
+    // A scene timer, not `time.now`: the clock hasn't ticked yet during create().
+    this.time.delayedCall(this.playIntro(variant, font) + HOLD_AFTER_INTRO, () => {
+      this.introDone = true;
+      this.maybeStart();
+    });
 
     const title = this.add
       .text(width / 2, height * 0.16, variant.name, textStyle(font * 2.8, accent, true))
@@ -102,6 +112,10 @@ export class LoadingScene extends Phaser.Scene {
   }
 
   private drawProgress: () => void = () => undefined;
+  private introDone = false;
+  private leaving = false;
+  private gameData: GameData | null = null;
+  private cardGroup?: Phaser.GameObjects.Container;
 
   private setProgress(value: number, message?: string): void {
     this.progress = Math.max(this.progress, value);
@@ -112,7 +126,6 @@ export class LoadingScene extends Phaser.Scene {
   }
 
   private async prepare(variant: VariantDefinition, data: LoadingData): Promise<void> {
-    const started = this.time.now;
     const rules = variant.createRules(data.difficulty);
     let gameData: GameData | null = data.resume ? this.restoreSaved(rules) : null;
 
@@ -127,14 +140,24 @@ export class LoadingScene extends Phaser.Scene {
       gameData = { variant: variant.id, difficulty: data.difficulty, seed: deal.seed, solution: deal.solution };
     }
 
-    this.setProgress(1, "Ready!");
-    const wait = Math.max(0, MIN_DURATION - (this.time.now - started));
-    this.time.delayedCall(wait, () => {
-      this.cameras.main.fadeOut(260, 0, 0, 0);
-      this.cameras.main.once(Phaser.Cameras.Scene2D.Events.FADE_OUT_COMPLETE, () =>
-        this.scene.start(SceneKey.Game, gameData)
-      );
-    });
+    this.gameData = gameData;
+    this.setProgress(1, "Ready! Tap to start");
+    // Continue once the intro has played out — or right away on a tap.
+    this.input.once(Phaser.Input.Events.POINTER_UP, () => this.maybeStart(true));
+    this.maybeStart();
+  }
+
+  private maybeStart(skipIntro = false): void {
+    const data = this.gameData;
+    if (!data || this.leaving || !(this.introDone || skipIntro)) {
+      return;
+    }
+    this.leaving = true;
+    this.outro();
+    this.cameras.main.fadeOut(380, 0, 0, 0);
+    this.cameras.main.once(Phaser.Cameras.Scene2D.Events.FADE_OUT_COMPLETE, () =>
+      this.scene.start(SceneKey.Game, data)
+    );
   }
 
   /** Rebuilds a saved game, validating every stored move against the rules. */
@@ -209,17 +232,21 @@ export class LoadingScene extends Phaser.Scene {
     }
   }
 
-  /** Deals the themed card arrangement that introduces this game. */
-  private playIntro(variant: VariantDefinition, font: number): void {
+  /**
+   * Deals the themed card arrangement that introduces this game: cards fly
+   * in one by one, turn over in a wave, then float. Returns its length (ms).
+   */
+  private playIntro(variant: VariantDefinition, font: number): number {
     const { width, height } = this.scale;
     const slots = INTROS[variant.theme.intro]();
     const spread = Math.max(...slots.map((slot) => Math.abs(slot.x))) + 0.6;
     const cardW = Math.min((width * 0.42) / spread, font * 4.2);
     const cardH = cardW * CARD_ASPECT;
-    const centre = new Phaser.Math.Vector2(width / 2, height * 0.46);
     const rules = variant.createRules("medium");
     const faces = shuffle([...rules.cards], createRng(variant.id.length * 7919));
-    const group = this.add.container(centre.x, centre.y);
+    const group = this.add.container(width / 2, height * 0.46);
+    this.cardGroup = group;
+    const landed = FLY_IN.start + slots.length * FLY_IN.stagger + FLY_IN.duration;
 
     slots.forEach((slot, i) => {
       const card = this.add.image(0, height * 0.5, CARD_TEXTURE, BACK_FRAME).setDisplaySize(cardW, cardH);
@@ -230,19 +257,21 @@ export class LoadingScene extends Phaser.Scene {
         x: slot.x * cardW,
         y: slot.y * cardH,
         angle: slot.angle,
-        duration: 520,
-        delay: 150 + i * 55,
+        duration: FLY_IN.duration,
+        delay: FLY_IN.start + i * FLY_IN.stagger,
         ease: "Back.easeOut",
+      });
+      // Once every card has landed, they turn over one after another.
+      this.tweens.add({
+        targets: card,
+        scaleX: 0,
+        duration: FLIP_WAVE.duration / 2,
+        delay: landed + i * FLIP_WAVE.stagger,
+        yoyo: true,
+        ease: "Sine.easeIn",
+        onYoyo: () => card.setFrame(frameOf(faces[i % faces.length])),
         onComplete: () => {
-          // Flip face-up, then float gently.
-          this.tweens.add({
-            targets: card,
-            scaleX: 0,
-            duration: 110,
-            yoyo: true,
-            onYoyo: () => card.setFrame(frameOf(faces[i % faces.length])),
-            onComplete: () => card.setScale(baseScaleX, card.scaleY),
-          });
+          card.setScale(baseScaleX, card.scaleY);
           this.tweens.add({
             targets: card,
             y: card.y - cardH * 0.05,
@@ -257,5 +286,14 @@ export class LoadingScene extends Phaser.Scene {
     if (variant.theme.intro === "spiral") {
       this.tweens.add({ targets: group, angle: 360, duration: 24000, repeat: -1 });
     }
+    return landed + slots.length * FLIP_WAVE.stagger + FLIP_WAVE.duration;
+  }
+
+  /** The cards gather into a deck as the screen fades out. */
+  private outro(): void {
+    this.cardGroup?.each((card: Phaser.GameObjects.Image) => {
+      this.tweens.killTweensOf(card);
+      this.tweens.add({ targets: card, x: 0, y: 0, angle: 0, duration: 360, ease: "Cubic.easeIn" });
+    });
   }
 }

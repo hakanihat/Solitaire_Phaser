@@ -19,6 +19,8 @@ export interface RenderOptions {
   readonly stagger?: number;
   /** Multiplier on the default move duration (autoplay runs faster). */
   readonly speed?: number;
+  /** Start moving cards row by row across the piles, like a dealer. */
+  readonly dealOrder?: boolean;
 }
 
 interface Geometry {
@@ -116,8 +118,13 @@ export class BoardView {
     const animate = options.animate ?? true;
     const stagger = options.stagger ?? 0;
     const speed = options.speed ?? 1;
-    const tweens: Promise<void>[] = [];
-    let moving = 0;
+    const journeys: {
+      card: CardView;
+      target: Phaser.Math.Vector2;
+      depth: number;
+      faceUp: boolean;
+      distance: number;
+    }[] = [];
 
     board.piles.forEach((pile, pileIndex) => {
       const spec = this.layout.piles[pileIndex];
@@ -141,11 +148,23 @@ export class BoardView {
           }
           return;
         }
-        const delay = moving * stagger;
-        moving += 1;
-        tweens.push(this.tweenCard(card, target, depth, delay, speed, distance));
-        card.setFaceUp(faceUp, animate, delay + 60 * speed);
+        journeys.push({ card, target, depth, faceUp, distance });
       });
+    });
+
+    if (options.dealOrder) {
+      // Row by row across the piles: every pile's first card, then every second card…
+      journeys.sort((a, b) => a.card.index - b.card.index || a.card.pile - b.card.pile);
+    }
+    // Only real trips take a turn in the stagger; tiny nudges start at once.
+    let order = 0;
+    const tweens = journeys.map(({ card, target, depth, faceUp, distance }) => {
+      const long = distance > this.geometry.cardW * 0.3;
+      const delay = long ? order * stagger : 0;
+      order += long ? 1 : 0;
+      const moving = this.tweenCard(card, target, depth, delay, speed, distance);
+      card.setFaceUp(faceUp, animate, delay + 60 * speed);
+      return moving;
     });
     this.updatePlaceholders(board);
     return Promise.all(tweens).then(() => undefined);
