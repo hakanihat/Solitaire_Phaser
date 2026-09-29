@@ -46,6 +46,7 @@ npm run lint
 the zip root, relative asset paths). On itch.io: *Kind of project* → HTML, upload the zip,
 tick *This file will be played in the browser*, set the viewport to 480 × 854, and enable
 *Mobile friendly* and *Fullscreen button*.
+The cover image is `marketing/itch-cover.png` (source: `marketing/cover.html`).
 
 **Android** — needs the Android SDK (Android Studio installs it). `npm run release:android`
 builds, syncs the web assets into the Capacitor project and produces
