@@ -40,8 +40,18 @@ npm test           # unit tests, including replaying every shipped deal
 npm run lint
 ```
 
-Android (Capacitor): `npm run build && npx cap sync android`, then open `android/` in
-Android Studio.
+### Releasing
+
+**Web / itch.io** — `npm run release:web` writes `release/solitaire-web.zip` (index.html at
+the zip root, relative asset paths). On itch.io: *Kind of project* → HTML, upload the zip,
+tick *This file will be played in the browser*, set the viewport to 480 × 854, and enable
+*Mobile friendly* and *Fullscreen button*.
+
+**Android** — needs the Android SDK (Android Studio installs it). `npm run release:android`
+builds, syncs the web assets into the Capacitor project and produces
+`android/app/build/outputs/apk/debug/app-debug.apk`, which can be copied to a phone and
+installed directly. For the Play Store, build a signed bundle from Android Studio
+(*Build → Generate Signed App Bundle*).
 
 ## Architecture
 
