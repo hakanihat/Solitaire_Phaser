@@ -12,14 +12,16 @@ import { type Settings, storage } from "../services/storage";
 import { getVariant } from "../variants";
 import { type Area, BoardView, DEPTH_DRAGGING } from "../view/BoardView";
 import type { CardView } from "../view/CardView";
-import { bouncingCascade, confetti, floatingText, ghostMove, glowCards, sparkle } from "../view/effects";
+import { foundationBurst, goldenPoints, victoryShow } from "../view/celebrations";
+import { bouncingCascade, confetti, ghostMove, glowCards } from "../view/effects";
+import { drawIcon } from "../view/icons";
 import { Hud } from "../view/Hud";
 import { runSliced, wait } from "../view/scheduler";
 import { openSettings } from "../view/SettingsPanel";
 import { addAmbient } from "../view/ambient";
 import { coverTable } from "../view/tablePainter";
 import { TutorialOverlay } from "../view/TutorialOverlay";
-import { Button, COLORS, Modal, Toast, textStyle } from "../view/ui";
+import { Button, COLORS, hex, Modal, Toast, textStyle } from "../view/ui";
 import { uiScale } from "../view/viewport";
 import { formatTime } from "./format";
 import { type GameData, type LoadingData, SceneKey } from "./keys";
@@ -300,36 +302,53 @@ export class GameScene extends Phaser.Scene {
     return stillValid;
   }
 
-  /** Sparkles on cards going home, points and combo pop-ups. */
+  /**
+   * Cards arriving home: a suit-symbol burst on each pile that received
+   * cards, a pop on the landing card, golden points and combo call-outs.
+   */
   private celebrateProgress(result: MoveResult): void {
     const gained = this.rules.progress(result.after) - this.rules.progress(result.before);
     if (gained <= 0 || result.move.kind === "draw") {
       return;
     }
-    const target = result.move.kind === "move" ? result.move.to : this.rules.pilesOf(PileKind.Foundation)[0];
-    const count = result.after.piles[target]?.length ?? 0;
-    const point = count > 0 ? this.boardView.cardCenter(target, count - 1) : this.boardView.dropAnchor(target);
+    // Foundations that grew (Spider runs and Pyramid pairs included); in chain
+    // games the cards go to a waste pile instead.
+    const homes = this.rules
+      .pilesOf(PileKind.Foundation)
+      .filter((pile) => result.after.piles[pile].length > result.before.piles[pile].length);
+    const targets = homes.length > 0 ? homes : result.move.kind === "move" ? [result.move.to] : [];
+    const cardW = this.boardView.cardWidth;
     const font = 16 * uiScale(this);
     playSfx(this, "foundation", 1 + Math.min(result.combo, 10) * 0.04);
-    sparkle(this, point.x, point.y, this.variant.theme.accent, this.boardView.cardWidth);
-    if (result.points > 0) {
-      floatingText(
-        this,
-        point.x,
-        point.y - this.boardView.cardHeight * 0.3,
-        `+${result.points}`,
-        COLORS.text,
-        font * 1.1
-      );
+
+    let first: Phaser.Math.Vector2 | undefined;
+    for (const [i, pile] of targets.entries()) {
+      const ids = result.after.piles[pile];
+      const id = ids[ids.length - 1];
+      if (id === undefined) {
+        continue;
+      }
+      const point = this.boardView.cardCenter(pile, ids.length - 1);
+      first ??= point;
+      const view = this.boardView.cards[id];
+      // A whole completed run (Spider, Scorpion) earns a longer volley.
+      const volleys = gained >= 13 ? 3 : 1;
+      for (let v = 0; v < volleys; v += 1) {
+        this.time.delayedCall(i * 90 + v * 220, () => foundationBurst(this, point.x, point.y, view.card.suit, cardW));
+      }
+      view.bump();
+    }
+
+    if (first && result.points > 0) {
+      goldenPoints(this, first.x, first.y - this.boardView.cardHeight * 0.4, `+${result.points}`, font * 1.45);
     }
     if (this.rules.comboScoring && result.combo >= 3) {
-      floatingText(
+      goldenPoints(
         this,
         this.scale.width / 2,
         this.hud.tableArea.y + this.hud.tableArea.height * 0.55,
         `Combo ×${result.combo}!`,
-        this.variant.theme.accent,
-        font * (1.6 + Math.min(result.combo, 12) * 0.08)
+        font * (1.8 + Math.min(result.combo, 12) * 0.1)
       );
     }
   }
@@ -674,10 +693,19 @@ export class GameScene extends Phaser.Scene {
     playSfx(this, "win");
     haptic("win");
     const { accent, table } = this.variant.theme;
-    const emitter = confetti(this, [accent, 0xffffff, table[0], 0xff6b6b, 0x4dd0e1]);
+    const emitter = confetti(this, [COLORS.gold, accent, 0xffffff, table[0], 0xff4d6d]);
     const cards = [...this.boardView.cards].sort((a, b) => b.depth - a.depth);
-    this.celebration.push(bouncingCascade(this, cards), () => emitter.destroy());
-    this.time.delayedCall(1900, () => this.showWinPanel({ time, timeBonus, score, ...record }));
+    const show = victoryShow(this, 16 * uiScale(this));
+    this.celebration.push(
+      bouncingCascade(this, cards),
+      () => emitter.destroy(),
+      () => show.dispose()
+    );
+    // Let the show breathe before the results appear.
+    this.time.delayedCall(2800, () => {
+      show.calm();
+      this.showWinPanel({ time, timeBonus, score, ...record });
+    });
   }
 
   private showWinPanel(result: {
@@ -691,38 +719,111 @@ export class GameScene extends Phaser.Scene {
     const font = 16 * uiScale(this);
     const accent = this.variant.theme.accent;
     const width = Math.min(this.scale.width * 0.9, font * 22);
-    const height = font * 19;
+    const height = font * 23;
+    const top = -height / 2;
     const modal = new Modal(this, {
       width,
       height,
-      title: "You won!",
-      titleSize: font * 2,
-      accent,
+      title: "Victory!",
+      titleSize: font * 2.1,
+      accent: COLORS.gold,
       dismissible: false,
     });
+
+    // A trophy medallion on the panel's rim, bouncing in.
+    const medal = this.add.container(0, top - font * 0.4);
+    medal.add(this.add.circle(0, 0, font * 2, 0x2a1c00).setStrokeStyle(font * 0.2, COLORS.gold));
+    medal.add(drawIcon(this, "trophy", font * 2.4, COLORS.gold));
+    medal.setScale(0);
+    this.tweens.add({ targets: medal, scale: 1, duration: 600, delay: 200, ease: "Back.easeOut" });
+    this.tweens.add({
+      targets: medal,
+      y: medal.y - font * 0.35,
+      duration: 900,
+      delay: 800,
+      yoyo: true,
+      repeat: -1,
+      ease: "Sine.easeInOut",
+    });
+
+    // The headline number: the final score, counting up in gold.
+    modal.panel.add(
+      this.add
+        .text(0, top + font * 5.3, "SCORE", textStyle(font * 0.75, COLORS.muted, true))
+        .setOrigin(0.5)
+        .setLetterSpacing(font * 0.2)
+    );
+    const scoreText = this.add
+      .text(0, top + font * 7.3, "0", {
+        ...textStyle(font * 2.8, COLORS.gold, true),
+        stroke: "#4a2f00",
+        strokeThickness: font * 0.3,
+        // Room for the glow, which Phaser would otherwise crop into a box.
+        padding: { x: font, y: font },
+      })
+      .setOrigin(0.5);
+    scoreText.setShadow(0, 0, hex(COLORS.gold), font * 0.8, true, true);
+    modal.panel.add(scoreText);
+    const counter = { value: 0 };
+    this.tweens.add({
+      targets: counter,
+      value: result.score,
+      duration: 1400,
+      delay: 350,
+      ease: "Cubic.easeOut",
+      onUpdate: () => scoreText.setText(String(Math.round(counter.value))),
+      onComplete: () => {
+        this.tweens.add({ targets: scoreText, scale: 1.15, duration: 140, yoyo: true });
+        if (result.newBestScore) {
+          const badge = this.add
+            .text(0, top + font * 9.2, "★ NEW BEST SCORE ★", textStyle(font * 0.8, COLORS.gold, true))
+            .setOrigin(0.5)
+            .setAlpha(0);
+          modal.panel.add(badge);
+          this.tweens.add({ targets: badge, alpha: 1, duration: 250 });
+          this.tweens.add({
+            targets: badge,
+            scale: 1.1,
+            duration: 600,
+            yoyo: true,
+            repeat: -1,
+            ease: "Sine.easeInOut",
+          });
+        }
+      },
+    });
+
     const rows: [string, string, boolean][] = [
       ["Time", formatTime(result.time), result.newBestTime],
       ["Moves", String(this.session.moves), false],
       ["Time bonus", `+${result.timeBonus}`, false],
-      ["Score", String(result.score), result.newBestScore],
       ["Win streak", String(result.stats.streak), false],
     ];
     rows.forEach(([label, value, best], i) => {
-      const y = -height / 2 + font * 5 + i * font * 1.9;
-      modal.panel.add(
-        this.add.text(-width / 2 + font * 1.5, y, label, textStyle(font, COLORS.muted)).setOrigin(0, 0.5)
-      );
-      modal.panel.add(
-        this.add
-          .text(
-            width / 2 - font * 1.5,
-            y,
-            best ? `${value}  ★ best` : value,
-            textStyle(font, best ? accent : COLORS.text, true)
-          )
-          .setOrigin(1, 0.5)
-      );
+      const y = top + font * 11 + i * font * 1.8;
+      const labelText = this.add
+        .text(-width / 2 + font * 1.5, y, label, textStyle(font, COLORS.muted))
+        .setOrigin(0, 0.5);
+      const valueText = this.add
+        .text(
+          width / 2 - font * 1.5,
+          y,
+          best ? `★ ${value}` : value,
+          textStyle(font, best ? COLORS.gold : COLORS.text, true)
+        )
+        .setOrigin(1, 0.5);
+      modal.panel.add([labelText, valueText]);
+      // Rows slide in one after another.
+      [labelText, valueText].forEach((text) => text.setAlpha(0).setX(text.x + font));
+      this.tweens.add({
+        targets: [labelText, valueText],
+        alpha: 1,
+        x: `-=${font}`,
+        duration: 300,
+        delay: 500 + i * 120,
+      });
     });
+    modal.panel.add(medal);
     const y = height / 2 - font * 2.4;
     modal.panel.add(
       new Button(this, -width / 4, y, {

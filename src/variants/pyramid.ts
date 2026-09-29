@@ -150,7 +150,7 @@ export class PyramidRules extends OverlapRules {
 export const pyramid: VariantDefinition = {
   id: "pyramid",
   name: "Pyramid",
-  tagline: "Pair cards that add up to 13",
+  tagline: "Pair cards to make 13",
   difficulties: {
     easy: { label: "Unlimited", detail: "Recycle the stock as often as you like" },
     medium: { label: "3 passes", detail: "Go through the stock three times" },

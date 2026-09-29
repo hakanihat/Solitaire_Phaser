@@ -145,7 +145,7 @@ export class FreeCellRules extends Rules {
 export const freecell: VariantDefinition = {
   id: "freecell",
   name: "FreeCell",
-  tagline: "Pure skill, every card visible",
+  tagline: "Every card in sight",
   difficulties: {
     easy: { label: "Relaxed", detail: "Four free cells and a gentle deal" },
     medium: { label: "Classic", detail: "Four free cells" },

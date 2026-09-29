@@ -16,7 +16,8 @@ const game = new Phaser.Game({
   height,
   // Render at physical resolution and scale down with CSS for crisp cards.
   scale: { mode: Phaser.Scale.NONE, zoom: 1 / DPR },
-  render: { antialias: true, roundPixels: false },
+  // roundPixels keeps text, icons and resting cards on whole device pixels (no blur).
+  render: { antialias: true, roundPixels: true },
   input: { activePointers: 2 },
   scene: [BootScene, MenuScene, LoadingScene, GameScene],
 });

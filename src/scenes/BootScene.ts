@@ -1,6 +1,7 @@
 import * as Phaser from "phaser";
 import { SOUND_FILES } from "../services/audio";
 import { CARD_SHEET, CARD_TEXTURE, createCardEffectTextures, registerCardFrames } from "../view/CardView";
+import { createSuitTexture } from "../view/celebrations";
 import { uiScale } from "../view/viewport";
 import { FX, SceneKey } from "./keys";
 
@@ -47,6 +48,7 @@ export class BootScene extends Phaser.Scene {
     registerCardFrames(this);
     createCardEffectTextures(this);
     this.createParticleTextures();
+    createSuitTexture(this);
     this.scene.start(SceneKey.Menu);
   }
 

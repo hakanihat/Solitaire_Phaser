@@ -252,6 +252,9 @@ export function paintTable(
   return key;
 }
 
+/** Distance from the screen edge to the table frame's inner line. */
+export const tableFrameInset = (width: number, height: number): number => (Math.min(width, height) / 90) * 1.6 * 1.6;
+
 /** A card-table border: a double inset line with a suit ornament in each corner. */
 function paintFrame(ctx: CanvasRenderingContext2D, w: number, h: number, unit: number, accent: number): void {
   const inset = unit * 1.6;

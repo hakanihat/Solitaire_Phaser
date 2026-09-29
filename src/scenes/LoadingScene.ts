@@ -7,7 +7,8 @@ import type { VariantDefinition } from "../core/variant";
 import { type Deal, loadDealList, nextDeal } from "../services/deals";
 import { storage } from "../services/storage";
 import { getVariant } from "../variants";
-import { CARD_ASPECT, CARD_TEXTURE, BACK_FRAME, frameOf } from "../view/CardView";
+import { cardImage } from "../view/cardAtlas";
+import { BACK_FRAME, CARD_ASPECT, frameOf } from "../view/CardView";
 import { INTROS } from "../view/intros";
 import { addAmbient } from "../view/ambient";
 import { coverTable } from "../view/tablePainter";
@@ -249,7 +250,7 @@ export class LoadingScene extends Phaser.Scene {
     const landed = FLY_IN.start + slots.length * FLY_IN.stagger + FLY_IN.duration;
 
     slots.forEach((slot, i) => {
-      const card = this.add.image(0, height * 0.5, CARD_TEXTURE, BACK_FRAME).setDisplaySize(cardW, cardH);
+      const card = cardImage(this, 0, height * 0.5, BACK_FRAME, cardW);
       group.add(card);
       const baseScaleX = card.scaleX;
       this.tweens.add({

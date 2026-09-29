@@ -147,7 +147,7 @@ export class YukonRules extends Rules {
 export const yukon: VariantDefinition = {
   id: "yukon",
   name: "Yukon",
-  tagline: "Any face-up card can move",
+  tagline: "Move any face-up card",
   difficulties: {
     easy: { label: "Gentle", detail: "Alternate colours, with an easier deal" },
     medium: { label: "Classic", detail: "Build down in alternate colours" },

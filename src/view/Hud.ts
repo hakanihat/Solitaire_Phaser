@@ -107,17 +107,21 @@ export class Hud {
       .lineStyle(1, 0xffffff, 0.12)
       .strokeRoundedRect(width / 2 - pillW / 2, pillY - pillH / 2, pillW, pillH, pillH / 2);
     this.objects.push(pill);
-    const chip = (index: number, icon: IconName): Chip => {
+    const chip = (index: number, icon: IconName, color: number = COLORS.text, iconColor = accent): Chip => {
       const x = width / 2 + (index - 1) * (pillW / 3);
       const container = scene.add.container(x, pillY);
-      const text = scene.add.text(font * 0.2, 0, "", textStyle(font * 0.85, COLORS.text, true)).setOrigin(0, 0.5);
-      container.add([drawIcon(scene, icon, font * 0.95, accent).setPosition(-font * 0.55, 0), text]);
+      const text = scene.add.text(font * 0.2, 0, "", textStyle(font * 0.85, color, true)).setOrigin(0, 0.5);
+      container.add([drawIcon(scene, icon, font * 0.95, iconColor).setPosition(-font * 0.55, 0), text]);
       this.objects.push(container);
       return { container, text };
     };
     this.time = chip(0, "clock");
     this.moves = chip(1, "moves");
-    this.score = chip(2, "star");
+    // Points are always gold, whatever the table's accent colour.
+    this.score = chip(2, "star", COLORS.gold, COLORS.gold);
+    // Padding gives the glow room (Phaser would crop it into a box).
+    this.score.text.setPadding(font * 0.4).setX(this.score.text.x - font * 0.4);
+    this.score.text.setShadow(0, 0, "#ffb300", font * 0.4, false, true);
 
     // Floating dock.
     const dockW = width - dockMargin * 2;

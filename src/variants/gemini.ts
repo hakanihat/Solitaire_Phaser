@@ -120,7 +120,7 @@ export class GeminiRules extends ChainRules {
 export const gemini: VariantDefinition = {
   id: "gemini",
   name: "Gemini",
-  tagline: "Two pyramids, twin chains",
+  tagline: "Two pyramids, two chains",
   original: true,
   difficulties: {
     easy: { label: "Open", detail: "All cards face-up, King ↔ Ace wraps" },

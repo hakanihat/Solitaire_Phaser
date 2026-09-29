@@ -4,10 +4,12 @@ import { DIFFICULTIES, type Difficulty } from "../core/Rules";
 import type { VariantDefinition, VariantTheme } from "../core/variant";
 import { storage } from "../services/storage";
 import { VARIANTS } from "../variants";
-import { CARD_ASPECT, CARD_TEXTURE, frameOf } from "../view/CardView";
+import { cardImage } from "../view/cardAtlas";
+import { frameOf } from "../view/CardView";
 import { openSettings } from "../view/SettingsPanel";
 import { addAmbient } from "../view/ambient";
-import { coverTable, paintTable } from "../view/tablePainter";
+import { ornateFrame } from "../view/frames";
+import { coverTable, paintTable, tableFrameInset } from "../view/tablePainter";
 import { TutorialOverlay } from "../view/TutorialOverlay";
 import { Button, COLORS, Modal, textStyle } from "../view/ui";
 import { drawIcon } from "../view/icons";
@@ -109,7 +111,8 @@ export class MenuScene extends Phaser.Scene {
       fontSize: font,
       onClick: () => openSettings(this, LOBBY_THEME.accent),
     });
-    gear.setDepth(50);
+    // Part of the page, so it scrolls away rather than floating over the tiles.
+    this.page.add(gear);
 
     this.enableScrolling(font);
     this.scale.once(Phaser.Scale.Events.RESIZE, () => this.scene.restart());
@@ -132,9 +135,7 @@ export class MenuScene extends Phaser.Scene {
         return;
       }
       const angle = (i - 1.5) * 12;
-      const sprite = this.add
-        .image(width / 2 + (i - 1.5) * cardW * 0.42, font * 5.2, CARD_TEXTURE, frameOf(card))
-        .setDisplaySize(cardW, cardW * CARD_ASPECT)
+      const sprite = cardImage(this, width / 2 + (i - 1.5) * cardW * 0.42, font * 5.2, frameOf(card), cardW)
         .setOrigin(0.5, 0.9)
         .setAngle(angle);
       this.page.add(sprite);
@@ -164,6 +165,10 @@ export class MenuScene extends Phaser.Scene {
     return font * 10.8;
   }
 
+  /**
+   * The "continue" card: a framed miniature of the saved game's table with
+   * its name, a peek of its cards and a play button.
+   */
   private buildResume(y: number, font: number): number {
     const saved = storage.savedGame();
     const variant = saved ? VARIANTS.find((candidate) => candidate.id === saved.variant) : undefined;
@@ -171,18 +176,77 @@ export class MenuScene extends Phaser.Scene {
       return y;
     }
     const { width } = this.scale;
-    const button = new Button(this, width / 2, y + font * 1.5, {
-      width: Math.min(width * 0.9, font * 24),
-      height: font * 3,
-      icon: "play",
-      label: `Continue ${variant.name} · ${variant.difficulties[saved.difficulty].label}`,
-      style: "primary",
-      accent: variant.theme.accent,
-      fontSize: font,
-      onClick: () => this.launch({ variant: variant.id, difficulty: saved.difficulty, resume: true }),
+    const w = Math.min(width - font * 2, font * 26);
+    const h = font * 4.6;
+    const radius = font * 1;
+    const resume = (): void => this.launch({ variant: variant.id, difficulty: saved.difficulty, resume: true });
+    const card = this.add.container(width / 2, y + h / 2 + font * 0.2);
+    const shadowBox = this.add
+      .graphics()
+      .fillStyle(0x000000, 0.35)
+      .fillRoundedRect(-w / 2 + 3, -h / 2 + 7, w, h, radius);
+    const face = this.add.image(
+      0,
+      0,
+      paintTable(this, variant.theme, `resume_${variant.id}`, w, h, { cornerRadius: radius })
+    );
+    const frame = this.add.image(
+      0,
+      0,
+      ornateFrame(this, `resume_${variant.id}`, w, h, radius, variant.theme.accent, true)
+    );
+    card.add([shadowBox, face, frame]);
+
+    // A peek at the game's signature cards on the left.
+    const cardW = h * 0.44;
+    (TILE_CARDS[variant.id] ?? []).slice(0, 2).forEach(([suit, rank], i) => {
+      const found = DECK.find((c) => c.suit === suit && c.rank === rank);
+      if (found) {
+        card.add(
+          cardImage(this, -w / 2 + font * 2.4 + i * cardW * 0.42, font * 0.2, frameOf(found), cardW).setAngle(
+            (i - 0.5) * 14
+          )
+        );
+      }
     });
-    this.page.add(button);
-    return y + font * 4;
+    const textX = -w / 2 + font * 5.4;
+    const kicker = this.add
+      .text(textX, -font * 0.75, "CONTINUE", textStyle(font * 0.72, COLORS.gold, true))
+      .setOrigin(0, 0.5)
+      .setLetterSpacing(font * 0.2);
+    const title = this.add
+      .text(
+        textX,
+        font * 0.55,
+        `${variant.name} · ${variant.difficulties[saved.difficulty].label}`,
+        textStyle(font * 1.1, COLORS.text, true)
+      )
+      .setOrigin(0, 0.5);
+    title.setShadow(0, 2, "#000000", 4, false, true);
+    const play = new Button(this, w / 2 - h * 0.66, 0, {
+      width: h * 0.68,
+      height: h * 0.68,
+      icon: "play",
+      style: "primary",
+      accent: COLORS.gold,
+      fontSize: font,
+      onClick: resume,
+    });
+    card.add([kicker, title, play]);
+    // A gentle pulse invites the player back in.
+    play.setPulse(true);
+
+    card.setSize(w, h).setInteractive({ useHandCursor: true });
+    card.on(Phaser.Input.Events.POINTER_DOWN, () => this.tweens.add({ targets: card, scale: 0.97, duration: 80 }));
+    card.on(Phaser.Input.Events.POINTER_OUT, () => this.tweens.add({ targets: card, scale: 1, duration: 120 }));
+    card.on(Phaser.Input.Events.POINTER_UP, () => {
+      this.tweens.add({ targets: card, scale: 1, duration: 150, ease: "Back.easeOut" });
+      if (!this.scrolled) {
+        resume();
+      }
+    });
+    this.page.add(card);
+    return y + h + font * 1.4;
   }
 
   private buildGrid(top: number, font: number): number {
@@ -224,50 +288,42 @@ export class MenuScene extends Phaser.Scene {
       0,
       paintTable(this, variant.theme, `tile_${variant.id}`, w, h, { cornerRadius: radius })
     );
-    const rim = this.add
-      .graphics()
-      .lineStyle(2, accent, 0.55)
-      .strokeRoundedRect(-w / 2, -h / 2, w, h, radius);
-    tile.add([shadow, face, rim]);
+    const frame = this.add.image(0, 0, ornateFrame(this, `tile_${variant.id}`, w, h, radius, accent, variant.original));
+    tile.add([shadow, face, frame]);
 
     // A little hand of the game's signature cards, fanned from a pivot.
-    const cardW = h * 0.34;
-    const pivotX = w / 2 - cardW * 1.05;
-    const pivotY = h * 0.14;
+    const cardW = h * 0.3;
+    const pivotX = w / 2 - cardW * 0.95;
+    const pivotY = h * 0.04;
     (TILE_CARDS[variant.id] ?? []).forEach(([suit, rank], i) => {
       const card = DECK.find((c) => c.suit === suit && c.rank === rank);
       if (card) {
         tile.add(
-          this.add
-            .image(pivotX + (i - 1) * cardW * 0.32, pivotY, CARD_TEXTURE, frameOf(card))
-            .setDisplaySize(cardW, cardW * CARD_ASPECT)
+          cardImage(this, pivotX + (i - 1) * cardW * 0.32, pivotY, frameOf(card), cardW)
             .setOrigin(0.5, 0.85)
             .setAngle((i - 1) * 16)
         );
       }
     });
 
-    // Text is stacked from the bottom edge so long taglines never overflow.
+    // Text is stacked from the bottom edge, inside the frame's filigree, so
+    // long taglines never overflow or cross the border.
+    const textLeft = -w / 2 + font * 1.25;
     const tagline = this.add
-      .text(-w / 2 + font * 0.8, h / 2 - font * 0.7, variant.tagline, {
+      .text(textLeft, h / 2 - font * 1.15, variant.tagline, {
         ...textStyle(font * 0.72, COLORS.muted),
-        wordWrap: { width: w - font * 1.6 },
+        wordWrap: { width: w - font * 2.5 },
       })
       .setOrigin(0, 1);
     const name = this.add
-      .text(
-        -w / 2 + font * 0.8,
-        tagline.y - tagline.height - font * 0.1,
-        variant.name,
-        textStyle(font * 1.2, COLORS.text, true)
-      )
+      .text(textLeft, tagline.y - tagline.height - font * 0.1, variant.name, textStyle(font * 1.2, COLORS.text, true))
       .setOrigin(0, 1);
     name.setShadow(0, 2, "#000000", 4, false, true);
     tagline.setShadow(0, 1, "#000000", 3, false, true);
     tile.add([name, tagline]);
 
     if (variant.original) {
-      const badge = this.add.text(-w / 2 + font * 0.7, -h / 2 + font * 0.7, "ORIGINAL", {
+      const badge = this.add.text(-w / 2 + font * 1.2, -h / 2 + font * 1.05, "ORIGINAL", {
         ...textStyle(font * 0.62, 0x1d1d2b, true),
         backgroundColor: `#${accent.toString(16).padStart(6, "0")}`,
         padding: { x: font * 0.4, y: font * 0.15 },
@@ -276,9 +332,9 @@ export class MenuScene extends Phaser.Scene {
     }
     const wins = storage.totalWins(variant.id);
     if (wins > 0) {
-      const trophy = drawIcon(this, "trophy", font * 0.9, accent).setPosition(
-        -w / 2 + font * 1.1,
-        -h / 2 + (variant.original ? font * 2.4 : font * 1.1)
+      const trophy = drawIcon(this, "trophy", font * 0.9, COLORS.gold).setPosition(
+        -w / 2 + font * 1.7,
+        -h / 2 + (variant.original ? font * 2.9 : font * 1.6)
       );
       const count = this.add
         .text(trophy.x + font * 0.7, trophy.y, String(wins), textStyle(font * 0.75, COLORS.text, true))
@@ -415,7 +471,16 @@ export class MenuScene extends Phaser.Scene {
 
   /** Drag / wheel scrolling for when the tiles don't fit on screen. */
   private enableScrolling(font: number): void {
-    const minY = Math.min(0, this.scale.height - this.pageHeight);
+    const { width, height } = this.scale;
+    // Clip the scrolling page to the inside of the table frame, so tiles
+    // slide under the border instead of spilling over it.
+    const inset = tableFrameInset(width, height);
+    const clip = this.make
+      .graphics({}, false)
+      .fillStyle(0xffffff)
+      .fillRect(0, inset, width, height - inset * 2);
+    this.page.setMask(clip.createGeometryMask());
+    const minY = Math.min(0, height - inset * 1.5 - this.pageHeight);
     const clampY = (value: number): number => Phaser.Math.Clamp(value, minY, 0);
     this.input.on(Phaser.Input.Events.POINTER_DOWN, (pointer: Phaser.Input.Pointer) => {
       if (this.overlayOpen()) {

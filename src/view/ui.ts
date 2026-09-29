@@ -10,6 +10,8 @@ export const COLORS = {
   panel: 0x16202c,
   panelEdge: 0x2f3d4f,
   shade: 0x000000,
+  /** Points, rewards and the victory banner. */
+  gold: 0xffd54f,
 } as const;
 
 export const hex = (color: number): string => `#${color.toString(16).padStart(6, "0")}`;
@@ -44,44 +46,151 @@ export interface ButtonOptions {
   readonly onClick: () => void;
 }
 
+/** Mixes a colour towards white (amount > 0) or black (amount < 0). */
+export function shade(color: number, amount: number): number {
+  const target = amount > 0 ? 255 : 0;
+  const t = Math.abs(amount);
+  const mix = (channel: number): number => Math.round(channel + (target - channel) * t);
+  return (mix((color >> 16) & 255) << 16) | (mix((color >> 8) & 255) << 8) | mix(color & 255);
+}
+
+const rgbaOf = (color: number, alpha: number): string =>
+  `rgba(${(color >> 16) & 255}, ${(color >> 8) & 255}, ${color & 255}, ${alpha})`;
+
+function pillPath(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number): void {
+  const r = Math.min(h / 2, w / 2);
+  ctx.beginPath();
+  ctx.moveTo(x + r, y);
+  ctx.arcTo(x + w, y, x + w, y + h, r);
+  ctx.arcTo(x + w, y + h, x, y + h, r);
+  ctx.arcTo(x, y + h, x, y, r);
+  ctx.arcTo(x, y, x + w, y, r);
+  ctx.closePath();
+}
+
 /**
- * Rounded button with an optional icon. Gives immediate press feedback
+ * Paints a button background (pill, or circle when square) into a cached
+ * canvas texture at native resolution: real gradients, a glossy highlight
+ * and a soft shadow — crisper and richer than vector shapes.
+ */
+function buttonSkin(
+  scene: Phaser.Scene,
+  style: "primary" | "ghost",
+  width: number,
+  height: number,
+  accent: number
+): string {
+  const w = Math.round(width);
+  const h = Math.round(height);
+  const key = `btn_${style}_${accent.toString(16)}_${w}x${h}`;
+  if (scene.textures.exists(key)) {
+    return key;
+  }
+  const pad = Math.ceil(h * 0.3);
+  const texture = scene.textures.createCanvas(key, w + pad * 2, h + pad * 2);
+  if (!texture) {
+    return key;
+  }
+  const ctx = texture.getContext();
+  const x = pad;
+  const y = pad;
+
+  // Soft drop shadow.
+  ctx.save();
+  ctx.shadowColor = "rgba(0, 0, 0, 0.45)";
+  ctx.shadowBlur = h * 0.28;
+  ctx.shadowOffsetY = h * 0.1;
+  pillPath(ctx, x, y, w, h);
+  ctx.fillStyle = style === "primary" ? hex(accent) : "rgba(12, 16, 22, 0.9)";
+  ctx.fill();
+  ctx.restore();
+
+  // Body gradient.
+  const body = ctx.createLinearGradient(0, y, 0, y + h);
+  if (style === "primary") {
+    body.addColorStop(0, hex(shade(accent, 0.35)));
+    body.addColorStop(0.55, hex(accent));
+    body.addColorStop(1, hex(shade(accent, -0.18)));
+  } else {
+    body.addColorStop(0, "rgba(46, 56, 72, 0.88)");
+    body.addColorStop(1, "rgba(12, 16, 22, 0.88)");
+  }
+  pillPath(ctx, x, y, w, h);
+  ctx.fillStyle = body;
+  ctx.fill();
+
+  // Glossy highlight across the upper half.
+  ctx.save();
+  pillPath(ctx, x, y, w, h);
+  ctx.clip();
+  const gloss = ctx.createLinearGradient(0, y, 0, y + h * 0.55);
+  gloss.addColorStop(0, `rgba(255, 255, 255, ${style === "primary" ? 0.45 : 0.16})`);
+  gloss.addColorStop(1, "rgba(255, 255, 255, 0)");
+  ctx.fillStyle = gloss;
+  ctx.fillRect(x, y, w, h * 0.55);
+  ctx.restore();
+
+  // Rim: light on top, darker at the bottom, for a pressed-metal edge.
+  const rim = ctx.createLinearGradient(0, y, 0, y + h);
+  if (style === "primary") {
+    rim.addColorStop(0, "rgba(255, 255, 255, 0.7)");
+    rim.addColorStop(1, rgbaOf(shade(accent, -0.45), 0.9));
+  } else {
+    rim.addColorStop(0, "rgba(255, 255, 255, 0.32)");
+    rim.addColorStop(1, rgbaOf(accent, 0.28));
+  }
+  ctx.lineWidth = Math.max(1.5, h * 0.035);
+  pillPath(ctx, x + ctx.lineWidth / 2, y + ctx.lineWidth / 2, w - ctx.lineWidth, h - ctx.lineWidth);
+  ctx.strokeStyle = rim;
+  ctx.stroke();
+
+  texture.refresh();
+  return key;
+}
+
+/**
+ * Glossy button with an optional icon. Gives immediate press feedback
  * (squash on press, spring back on release) and only fires when the pointer
  * is released over the button, so drags that start on a button are harmless.
+ * Square buttons render as circles.
  */
 export class Button extends Phaser.GameObjects.Container {
-  private readonly background: Phaser.GameObjects.Graphics;
   private readonly caption?: Phaser.GameObjects.Text;
+  /** Toolbar style: the soft disc behind the icon that brightens on press. */
+  private readonly bubble?: Phaser.GameObjects.Arc;
   private enabled = true;
   private pressed = false;
   private pulseTween?: Phaser.Tweens.Tween;
 
-  public constructor(
-    scene: Phaser.Scene,
-    x: number,
-    y: number,
-    private readonly options: ButtonOptions
-  ) {
+  public constructor(scene: Phaser.Scene, x: number, y: number, options: ButtonOptions) {
     super(scene, x, y);
     const { width, height, label, icon, accent, fontSize } = options;
     const style = options.style ?? "ghost";
-    this.background = scene.add.graphics();
-    this.drawBackground(style, accent);
-    this.add(this.background);
+    if (style !== "toolbar") {
+      this.add(scene.add.image(0, 0, buttonSkin(scene, style, width, height, accent)));
+    }
 
     const foreground = style === "primary" && isLight(accent) ? COLORS.textDark : COLORS.text;
     if (icon) {
-      const iconSize = style === "toolbar" ? height * 0.42 : height * 0.5;
-      const iconY = style === "toolbar" && label ? -height * 0.14 : 0;
-      const iconX = style !== "toolbar" && label ? -width / 2 + height * 0.55 : 0;
+      const iconSize = style === "toolbar" ? height * 0.36 : label ? height * 0.46 : height * 0.5;
+      const iconY = style === "toolbar" && label ? -height * 0.16 : 0;
+      const iconX = style !== "toolbar" && label ? -width / 2 + height * 0.62 : 0;
+      if (style === "toolbar") {
+        this.bubble = scene.add.circle(0, iconY, height * 0.3, accent, 0.14);
+        this.add(this.bubble);
+      }
       this.add(drawIcon(scene, icon, iconSize, style === "toolbar" ? accent : foreground).setPosition(iconX, iconY));
     }
     if (label) {
-      const captionY = style === "toolbar" && icon ? height * 0.28 : 0;
-      const captionX = style !== "toolbar" && icon ? height * 0.25 : 0;
+      const captionY = style === "toolbar" && icon ? height * 0.3 : 0;
+      const captionX = style !== "toolbar" && icon ? height * 0.28 : 0;
+      const size = style === "toolbar" ? fontSize * 0.86 : fontSize * 1.08;
       this.caption = scene.add
-        .text(captionX, captionY, label, textStyle(style === "toolbar" ? fontSize * 0.72 : fontSize, foreground, true))
+        .text(captionX, captionY, label, textStyle(size, style === "toolbar" ? COLORS.text : foreground, true))
         .setOrigin(0.5);
+      if (style === "primary" && !isLight(accent)) {
+        this.caption.setShadow(0, 1, "rgba(0,0,0,0.4)", 2);
+      }
       this.add(this.caption);
     }
 
@@ -139,34 +248,14 @@ export class Button extends Phaser.GameObjects.Container {
       duration: down ? 70 : 160,
       ease: down ? "Quad.easeOut" : "Back.easeOut",
     });
-  }
-
-  private drawBackground(style: ButtonStyle, accent: number): void {
-    const { width, height } = this.options;
-    const radius = Math.min(height / 2, height * 0.3);
-    const g = this.background;
-    g.clear();
-    if (style === "primary") {
-      g.fillStyle(0x000000, 0.25).fillRoundedRect(-width / 2, -height / 2 + height * 0.06, width, height, radius);
-      g.fillStyle(accent, 1).fillRoundedRect(-width / 2, -height / 2, width, height, radius);
-      g.fillStyle(0xffffff, 0.18).fillRoundedRect(
-        -width / 2 + 2,
-        -height / 2 + 2,
-        width - 4,
-        height * 0.45,
-        radius * 0.8
-      );
-    } else if (style === "ghost") {
-      g.fillStyle(0x000000, 0.32).fillRoundedRect(-width / 2, -height / 2, width, height, radius);
-      g.lineStyle(Math.max(1, height * 0.03), 0xffffff, 0.18).strokeRoundedRect(
-        -width / 2,
-        -height / 2,
-        width,
-        height,
-        radius
-      );
+    if (this.bubble) {
+      this.scene.tweens.add({
+        targets: this.bubble,
+        fillAlpha: down ? 0.34 : 0.14,
+        scale: down ? 1.12 : 1,
+        duration: 120,
+      });
     }
-    // Toolbar buttons are bare icon + caption; the toolbar draws the backdrop.
   }
 }
 
@@ -239,7 +328,8 @@ export class Modal extends Phaser.GameObjects.Container {
     this.panel.add([bg, blocker, title]);
     this.add(this.panel);
 
-    this.setDepth(1000);
+    // Above cards, effects and the victory show.
+    this.setDepth(20000);
     scene.add.existing(this);
     this.panel.setScale(0.9).setAlpha(0);
     shade.setAlpha(0);

@@ -1,5 +1,5 @@
 import * as Phaser from "phaser";
-import { CARD_SHEET, CARD_TEXTURE } from "./CardView";
+import { CARD_ASPECT, CARD_SHEET, CARD_TEXTURE } from "./CardView";
 
 /** A card sheet pre-rendered at the size the cards are shown on screen. */
 export interface CardAtlas {
@@ -12,6 +12,9 @@ export interface CardAtlas {
 }
 
 const ATLAS_PREFIX = "cards_atlas_";
+/** Menu, loading screen and game each use their own size. */
+const MAX_ATLASES = 4;
+const recent: string[] = [];
 /** Atlas grid; 8 × 7 = 56 cells keeps the texture roughly square. */
 const COLUMNS = 8;
 const ROWS = 7;
@@ -111,10 +114,23 @@ export function buildCardAtlas(scene: Phaser.Scene, cardWidth: number, cardHeigh
   texture.refresh();
   texture.setFilter(Phaser.Textures.FilterMode.LINEAR);
 
-  // Only one size is needed at a time; drop atlases from earlier layouts.
-  scene.textures
-    .getTextureKeys()
-    .filter((existing) => existing.startsWith(ATLAS_PREFIX) && existing !== key)
-    .forEach((existing) => scene.time.delayedCall(0, () => scene.textures.remove(existing)));
+  // Keep only the most recent few sizes (menu, loading screen, game).
+  recent.push(key);
+  while (recent.length > MAX_ATLASES) {
+    const stale = recent.shift() as string;
+    scene.time.delayedCall(0, () => scene.textures.remove(stale));
+  }
   return atlas;
+}
+
+/** A crisp card image `width` pixels wide, drawn from a matching atlas. */
+export function cardImage(
+  scene: Phaser.Scene,
+  x: number,
+  y: number,
+  frame: number,
+  width: number
+): Phaser.GameObjects.Image {
+  const atlas = buildCardAtlas(scene, width, width * CARD_ASPECT);
+  return scene.add.image(x, y, atlas.key, frame).setScale(width / atlas.width);
 }

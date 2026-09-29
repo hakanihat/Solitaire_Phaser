@@ -33,4 +33,6 @@ export const FX = {
   dot: "fx_dot",
   spark: "fx_spark",
   confetti: "fx_confetti",
+  /** The four suits as frames 0–3, for celebratory particles. */
+  suits: "fx_suits",
 } as const;
