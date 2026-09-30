@@ -192,7 +192,14 @@ export const klondike: VariantDefinition = {
       text: "Uncover face-down cards early, and don't rush cards to the foundation if you still need them to build on. Every deal here is guaranteed winnable!",
     },
   ],
-  theme: { table: [0x1f7a4d, 0x0b3d24], accent: 0xffd166, pattern: "felt", ambient: "motes", intro: "fan" },
+  theme: {
+    table: [0x1f7a4d, 0x0b3d24],
+    accent: 0xffd166,
+    pattern: "felt",
+    ambient: "motes",
+    intro: "fan",
+    emblem: "goldRush",
+  },
   solver: { strategy: "best-first", verifyNodes: 150_000, hintNodes: 30_000 },
   createRules: (difficulty) => new KlondikeRules(OPTIONS[difficulty]),
 };

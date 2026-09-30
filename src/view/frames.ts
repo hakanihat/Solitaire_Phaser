@@ -68,11 +68,12 @@ export function ornateFrame(
   sheen.addColorStop(1, "rgba(255,255,255,0)");
   ctx.fillStyle = sheen;
   ctx.fillRect(0, 0, w, h * 0.45);
-  const floor = ctx.createLinearGradient(0, h * 0.4, 0, h);
+  // A shade under the title area only, so the tile's artwork stays vivid.
+  const floor = ctx.createLinearGradient(0, h * 0.5, 0, h);
   floor.addColorStop(0, "rgba(0,0,0,0)");
-  floor.addColorStop(1, "rgba(0,0,0,0.62)");
+  floor.addColorStop(1, "rgba(0,0,0,0.55)");
   ctx.fillStyle = floor;
-  ctx.fillRect(0, h * 0.4, w, h * 0.6);
+  ctx.fillRect(0, h * 0.5, w, h * 0.5);
   ctx.restore();
 
   const rim = rimGradient(ctx, h, accent, gilded);

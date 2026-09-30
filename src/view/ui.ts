@@ -1,4 +1,5 @@
 import * as Phaser from "phaser";
+import { rgba } from "./color";
 import { drawIcon, type IconName } from "./icons";
 
 export const FONT_FAMILY = '"Nunito", "Segoe UI", "Roboto", "Helvetica Neue", Arial, sans-serif';
@@ -53,9 +54,6 @@ export function shade(color: number, amount: number): number {
   const mix = (channel: number): number => Math.round(channel + (target - channel) * t);
   return (mix((color >> 16) & 255) << 16) | (mix((color >> 8) & 255) << 8) | mix(color & 255);
 }
-
-const rgbaOf = (color: number, alpha: number): string =>
-  `rgba(${(color >> 16) & 255}, ${(color >> 8) & 255}, ${color & 255}, ${alpha})`;
 
 function pillPath(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number): void {
   const r = Math.min(h / 2, w / 2);
@@ -134,10 +132,10 @@ function buttonSkin(
   const rim = ctx.createLinearGradient(0, y, 0, y + h);
   if (style === "primary") {
     rim.addColorStop(0, "rgba(255, 255, 255, 0.7)");
-    rim.addColorStop(1, rgbaOf(shade(accent, -0.45), 0.9));
+    rim.addColorStop(1, rgba(shade(accent, -0.45), 0.9));
   } else {
     rim.addColorStop(0, "rgba(255, 255, 255, 0.32)");
-    rim.addColorStop(1, rgbaOf(accent, 0.28));
+    rim.addColorStop(1, rgba(accent, 0.28));
   }
   ctx.lineWidth = Math.max(1.5, h * 0.035);
   pillPath(ctx, x + ctx.lineWidth / 2, y + ctx.lineWidth / 2, w - ctx.lineWidth, h - ctx.lineWidth);

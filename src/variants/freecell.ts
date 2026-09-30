@@ -177,7 +177,14 @@ export const freecell: VariantDefinition = {
       text: "Free the Aces and Twos first and keep at least one cell open. An empty column is worth more than a free cell.",
     },
   ],
-  theme: { table: [0x157a7a, 0x063434], accent: 0x7ff3e1, pattern: "diamonds", ambient: "bubbles", intro: "cascade" },
+  theme: {
+    table: [0x157a7a, 0x063434],
+    accent: 0x7ff3e1,
+    pattern: "diamonds",
+    ambient: "bubbles",
+    intro: "cascade",
+    emblem: "undersea",
+  },
   solver: { strategy: "best-first", verifyNodes: 200_000, hintNodes: 40_000, effort: { easy: { maxNodes: 150 } } },
   createRules: (difficulty) => new FreeCellRules(CELLS[difficulty]),
 };

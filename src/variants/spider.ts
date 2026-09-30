@@ -191,7 +191,14 @@ export const spider: VariantDefinition = {
       text: "Prefer same-suit joins, and turn over face-down cards before dealing new rows.",
     },
   ],
-  theme: { table: [0x4a4a5e, 0x15151f], accent: 0xff8a80, pattern: "web", ambient: "twinkle", intro: "cascade" },
+  theme: {
+    table: [0x4a4a5e, 0x15151f],
+    accent: 0xff8a80,
+    pattern: "web",
+    ambient: "twinkle",
+    intro: "cascade",
+    emblem: "web",
+  },
   solver: { strategy: "best-first", verifyNodes: 200_000, hintNodes: 40_000 },
   createRules: (difficulty) => new SpiderRules(SUITS[difficulty]),
 };

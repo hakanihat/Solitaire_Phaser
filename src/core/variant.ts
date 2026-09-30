@@ -20,6 +20,10 @@ export interface TutorialStep {
 export type Pattern =
   "felt" | "diamonds" | "waves" | "rays" | "hexagons" | "dots" | "stripes" | "stars" | "web" | "scales" | "bricks";
 
+/** Scenes painted on menu tiles; see view/emblems.ts. */
+export type Emblem =
+  "goldRush" | "web" | "undersea" | "pyramids" | "peaks" | "golf" | "pines" | "scorpion" | "sunrise" | "twins";
+
 /** Slow particle atmosphere drawn over the table. */
 export type Ambient = "motes" | "snow" | "bubbles" | "embers" | "sand" | "petals" | "twinkle";
 
@@ -32,6 +36,8 @@ export interface VariantTheme {
   readonly ambient: Ambient;
   /** How the loading screen arranges its cards. */
   readonly intro: "fan" | "pyramid" | "peaks" | "cascade" | "spiral" | "twins" | "grid" | "columns";
+  /** Illustrated scene on the game's menu tile (a spider on its web, pyramids…). */
+  readonly emblem?: Emblem;
 }
 
 export interface SolverProfile {

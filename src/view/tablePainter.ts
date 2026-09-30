@@ -1,10 +1,8 @@
 import type * as Phaser from "phaser";
 import { createRng, type Rng } from "../core/random";
 import type { Pattern, VariantTheme } from "../core/variant";
-
-/** CSS colour string from a 0xRRGGBB number and alpha. */
-export const rgba = (color: number, alpha = 1): string =>
-  `rgba(${(color >> 16) & 255}, ${(color >> 8) & 255}, ${color & 255}, ${alpha})`;
+import { rgba } from "./color";
+import { paintEmblem } from "./emblems";
 
 type PatternPainter = (ctx: CanvasRenderingContext2D, w: number, h: number, rng: Rng, unit: number) => void;
 
@@ -169,6 +167,8 @@ export interface TableOptions {
   readonly cornerRadius?: number;
   /** Draw a decorative frame with suit ornaments (full-screen tables). */
   readonly frame?: FrameStyle;
+  /** Paint the game's illustrated scene (menu tiles). */
+  readonly emblem?: boolean;
 }
 
 /**
@@ -188,7 +188,10 @@ export function paintTable(
   height: number,
   options: TableOptions = {}
 ): string {
-  const key = `table_${id}_${Math.round(width)}x${Math.round(height)}${options.frame ? `_${options.frame}` : ""}`;
+  const emblem = options.emblem ? theme.emblem : undefined;
+  const key = [`table_${id}_${Math.round(width)}x${Math.round(height)}`, options.frame, emblem]
+    .filter(Boolean)
+    .join("_");
   if (scene.textures.exists(key)) {
     return key;
   }
@@ -221,6 +224,9 @@ export function paintTable(
   PATTERNS[theme.pattern](ctx, width, height, rng, unit);
   if (theme.pattern !== "felt") {
     PATTERNS.felt(ctx, width, height, rng, unit * 1.6);
+  }
+  if (emblem) {
+    paintEmblem(ctx, emblem, width, height, theme);
   }
 
   // 3. A gentle spotlight where the cards are.

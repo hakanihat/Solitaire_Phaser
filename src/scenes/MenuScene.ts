@@ -13,7 +13,7 @@ import { addAmbient } from "../view/ambient";
 import { ornateFrame } from "../view/frames";
 import { coverTable, paintTable, tableFrameInset } from "../view/tablePainter";
 import { TutorialOverlay } from "../view/TutorialOverlay";
-import { Button, COLORS, Modal, textStyle } from "../view/ui";
+import { Button, COLORS, Modal, shade, textStyle } from "../view/ui";
 import { drawIcon } from "../view/icons";
 import { uiScale } from "../view/viewport";
 import { formatTime } from "./format";
@@ -271,6 +271,30 @@ export class MenuScene extends Phaser.Scene {
     return top + Math.ceil(VARIANTS.length / columns) * (tileH + margin);
   }
 
+  /** "ORIGINAL" pill sitting on a tile's top edge, for games designed for this collection. */
+  private originalBadge(accent: number, y: number, font: number): Phaser.GameObjects.Container {
+    const label = this.add
+      .text(0, 0, "ORIGINAL", textStyle(font * 0.62, 0x1d1d2b, true))
+      .setOrigin(0.5)
+      .setLetterSpacing(font * 0.14);
+    const w = label.width + font * 1.4;
+    const h = font * 1.25;
+    const pill = this.add.graphics();
+    pill.fillStyle(0x000000, 0.35).fillRoundedRect(-w / 2, -h / 2 + font * 0.12, w, h, h / 2);
+    pill.fillStyle(accent, 1).fillRoundedRect(-w / 2, -h / 2, w, h, h / 2);
+    pill.lineStyle(Math.max(1.5, font * 0.1), shade(accent, -0.45), 1).strokeRoundedRect(-w / 2, -h / 2, w, h, h / 2);
+    pill
+      .lineStyle(Math.max(1, font * 0.05), 0xffffff, 0.5)
+      .strokeRoundedRect(
+        -w / 2 + font * 0.14,
+        -h / 2 + font * 0.1,
+        w - font * 0.28,
+        h - font * 0.2,
+        (h - font * 0.2) / 2
+      );
+    return this.add.container(0, y, [pill, label]);
+  }
+
   private buildTile(
     variant: VariantDefinition,
     x: number,
@@ -282,7 +306,7 @@ export class MenuScene extends Phaser.Scene {
     const tile = this.add.container(x, y);
     const { accent } = variant.theme;
     const radius = font * 0.8;
-    // Each tile is a miniature of the game's own table.
+    // Each tile is the game's own table with an illustrated scene of the game.
     const shadow = this.add
       .graphics()
       .fillStyle(0x000000, 0.3)
@@ -290,7 +314,7 @@ export class MenuScene extends Phaser.Scene {
     const face = this.add.image(
       0,
       0,
-      paintTable(this, variant.theme, `tile_${variant.id}`, w, h, { cornerRadius: radius })
+      paintTable(this, variant.theme, `tile_${variant.id}`, w, h, { cornerRadius: radius, emblem: true })
     );
     const frame = this.add.image(0, 0, ornateFrame(this, `tile_${variant.id}`, w, h, radius, accent, variant.original));
     tile.add([shadow, face, frame]);
@@ -327,12 +351,7 @@ export class MenuScene extends Phaser.Scene {
     tile.add([name, tagline]);
 
     if (variant.original) {
-      const badge = this.add.text(-w / 2 + font * 1.2, -h / 2 + font * 1.05, "ORIGINAL", {
-        ...textStyle(font * 0.62, 0x1d1d2b, true),
-        backgroundColor: `#${accent.toString(16).padStart(6, "0")}`,
-        padding: { x: font * 0.4, y: font * 0.15 },
-      });
-      tile.add(badge);
+      tile.add(this.originalBadge(accent, -h / 2, font));
     }
     const wins = storage.totalWins(variant.id);
     if (wins > 0) {

@@ -156,7 +156,14 @@ export const golf: VariantDefinition = {
       text: "Plan runs that go up and down (5-6-5-4) and save stock cards for when you really need them. Combos score more!",
     },
   ],
-  theme: { table: [0x7cb342, 0x2e5c14], accent: 0xfff59d, pattern: "stripes", ambient: "petals", intro: "columns" },
+  theme: {
+    table: [0x7cb342, 0x2e5c14],
+    accent: 0xfff59d,
+    pattern: "stripes",
+    ambient: "petals",
+    intro: "columns",
+    emblem: "golf",
+  },
   solver: { strategy: "best-first", verifyNodes: 200_000, hintNodes: 40_000 },
   createRules: (difficulty) => new GolfRules(OPTIONS[difficulty]),
 };

@@ -153,7 +153,14 @@ export const gemini: VariantDefinition = {
       text: "Before playing, check whether the other twin could take the next card. A chain that alternates between twins can clear a whole pyramid!",
     },
   ],
-  theme: { table: [0x40307a, 0x120b2e], accent: 0xc9a8ff, pattern: "stars", ambient: "twinkle", intro: "twins" },
+  theme: {
+    table: [0x40307a, 0x120b2e],
+    accent: 0xc9a8ff,
+    pattern: "stars",
+    ambient: "twinkle",
+    intro: "twins",
+    emblem: "twins",
+  },
   solver: { strategy: "best-first", verifyNodes: 200_000, hintNodes: 40_000 },
   createRules: (difficulty) => new GeminiRules(OPTIONS[difficulty]),
 };
