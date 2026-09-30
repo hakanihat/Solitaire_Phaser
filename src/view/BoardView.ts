@@ -2,6 +2,7 @@ import * as Phaser from "phaser";
 import type { Board } from "../core/board";
 import { Fan, type Layout, mirrorLayout, PileKind, type PileSpec } from "../core/layout";
 import type { Rules } from "../core/Rules";
+import { bakedImage } from "./bake";
 import { buildCardAtlas, releaseCardAtlas } from "./cardAtlas";
 import { tableFrameInset } from "./tablePainter";
 import { CARD_ASPECT, CardView, EFFECT_PADDING_RATIO, GLOW_TEXTURE } from "./CardView";
@@ -416,6 +417,27 @@ export class BoardView {
     return positions;
   }
 
+  /** An empty pile's outline, drawn once per card size and shared by every pile. */
+  private slotOutline(cardW: number, cardH: number): Phaser.GameObjects.Image {
+    const line = Math.max(1.5, cardW * 0.022);
+    const pad = Math.ceil(line) + 1;
+    const key = `slot_${this.accent.toString(16)}_${Math.round(cardW)}x${Math.round(cardH)}`;
+    return bakedImage(this.scene, key, cardW + pad * 2, cardH + pad * 2, (g) => {
+      const radius = cardW * 0.07;
+      const inset = cardW * 0.06;
+      g.fillStyle(0x000000, 0.2).fillRoundedRect(pad, pad, cardW, cardH, radius);
+      g.lineStyle(line, 0xffffff, 0.26).strokeRoundedRect(pad, pad, cardW, cardH, radius);
+      // A faint inner line, like the stitched outline printed on a playmat.
+      g.lineStyle(Math.max(1, cardW * 0.012), this.accent, 0.22).strokeRoundedRect(
+        pad + inset,
+        pad + inset,
+        cardW - inset * 2,
+        cardH - inset * 2,
+        radius * 0.6
+      );
+    });
+  }
+
   private drawPlaceholders(): void {
     this.placeholders.splice(0).forEach((holder) => holder.destroy());
     this.stockBadges.forEach((badge) => badge.destroy());
@@ -425,24 +447,7 @@ export class BoardView {
       const base = this.pileBase(pile);
       const holder = this.scene.add.container(base.x, base.y).setDepth(1);
       if (!spec.hideWhenEmpty) {
-        const outline = this.scene.add.graphics();
-        const radius = cardW * 0.07;
-        const inset = cardW * 0.06;
-        outline.fillStyle(0x000000, 0.2).fillRoundedRect(-cardW / 2, -cardH / 2, cardW, cardH, radius);
-        outline
-          .lineStyle(Math.max(1.5, cardW * 0.022), 0xffffff, 0.26)
-          .strokeRoundedRect(-cardW / 2, -cardH / 2, cardW, cardH, radius);
-        // A faint inner line, like the stitched outline printed on a playmat.
-        outline
-          .lineStyle(Math.max(1, cardW * 0.012), this.accent, 0.22)
-          .strokeRoundedRect(
-            -cardW / 2 + inset,
-            -cardH / 2 + inset,
-            cardW - inset * 2,
-            cardH - inset * 2,
-            radius * 0.6
-          );
-        holder.add(outline);
+        holder.add(this.slotOutline(cardW, cardH));
         const label = this.scene.add
           .text(
             0,

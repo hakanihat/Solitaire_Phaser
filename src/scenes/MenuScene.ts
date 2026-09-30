@@ -5,6 +5,7 @@ import type { VariantDefinition, VariantTheme } from "../core/variant";
 import { INPUT_RESET } from "../services/lifecycle";
 import { storage } from "../services/storage";
 import { VARIANTS } from "../variants";
+import { bakedImage } from "../view/bake";
 import { cardImage } from "../view/cardAtlas";
 import { frameOf } from "../view/CardView";
 import { smoothMotion } from "../view/pixelSnap";
@@ -280,19 +281,21 @@ export class MenuScene extends Phaser.Scene {
       .setLetterSpacing(font * 0.14);
     const w = label.width + font * 1.4;
     const h = font * 1.25;
-    const pill = this.add.graphics();
-    pill.fillStyle(0x000000, 0.35).fillRoundedRect(-w / 2, -h / 2 + font * 0.12, w, h, h / 2);
-    pill.fillStyle(accent, 1).fillRoundedRect(-w / 2, -h / 2, w, h, h / 2);
-    pill.lineStyle(Math.max(1.5, font * 0.1), shade(accent, -0.45), 1).strokeRoundedRect(-w / 2, -h / 2, w, h, h / 2);
-    pill
-      .lineStyle(Math.max(1, font * 0.05), 0xffffff, 0.5)
-      .strokeRoundedRect(
-        -w / 2 + font * 0.14,
-        -h / 2 + font * 0.1,
+    const drop = font * 0.12;
+    const pad = Math.ceil(font * 0.1) + 1;
+    const key = `badge_${accent.toString(16)}_${Math.round(w)}x${Math.round(h)}`;
+    const pill = bakedImage(this, key, w + pad * 2, h + drop + pad * 2, (g) => {
+      g.fillStyle(0x000000, 0.35).fillRoundedRect(pad, pad + drop, w, h, h / 2);
+      g.fillStyle(accent, 1).fillRoundedRect(pad, pad, w, h, h / 2);
+      g.lineStyle(Math.max(1.5, font * 0.1), shade(accent, -0.45), 1).strokeRoundedRect(pad, pad, w, h, h / 2);
+      g.lineStyle(Math.max(1, font * 0.05), 0xffffff, 0.5).strokeRoundedRect(
+        pad + font * 0.14,
+        pad + font * 0.1,
         w - font * 0.28,
         h - font * 0.2,
         (h - font * 0.2) / 2
       );
+    }).setPosition(0, drop / 2);
     return this.add.container(0, y, [pill, label]);
   }
 

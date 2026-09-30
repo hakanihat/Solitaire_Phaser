@@ -1,4 +1,5 @@
 import type * as Phaser from "phaser";
+import { bakedImage } from "./bake";
 
 export type IconName =
   | "undo"
@@ -114,15 +115,15 @@ const ICONS: Record<IconName, IconPainter> = {
   },
 };
 
-export function drawIcon(
-  scene: Phaser.Scene,
-  name: IconName,
-  size: number,
-  color: number
-): Phaser.GameObjects.Graphics {
-  const g = scene.add.graphics();
-  g.lineStyle(Math.max(1.5, size * 0.09), color, 1);
-  g.fillStyle(color, 1);
-  ICONS[name](g, size);
-  return g;
+/** An icon as a crisp image, `size` pixels across, rendered once per size and colour. */
+export function drawIcon(scene: Phaser.Scene, name: IconName, size: number, color: number): Phaser.GameObjects.Image {
+  const stroke = Math.max(1.5, size * 0.09);
+  // Icons are drawn around (0, 0) within about ±0.6 × size.
+  const box = Math.ceil(size * 1.4 + stroke * 2);
+  return bakedImage(scene, `icon_${name}_${color.toString(16)}_${Math.round(size)}`, box, box, (g) => {
+    g.translateCanvas(box / 2, box / 2);
+    g.lineStyle(stroke, color, 1);
+    g.fillStyle(color, 1);
+    ICONS[name](g, size);
+  });
 }

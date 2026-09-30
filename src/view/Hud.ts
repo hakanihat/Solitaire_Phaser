@@ -3,6 +3,7 @@ import type { Difficulty } from "../core/Rules";
 import type { VariantDefinition } from "../core/variant";
 import { formatTime } from "../scenes/format";
 import type { Area } from "./BoardView";
+import { bakedImage } from "./bake";
 import { drawIcon, type IconName } from "./icons";
 import { Button, COLORS, textStyle } from "./ui";
 import { uiScale } from "./viewport";
@@ -25,6 +26,25 @@ export interface HudStats {
 }
 
 const DEPTH = 700;
+
+/** A top-down dark fade as a tiny gradient texture stretched across the screen. */
+function headerShade(scene: Phaser.Scene, width: number, height: number): Phaser.GameObjects.Image {
+  const h = Math.max(2, Math.round(height));
+  const key = `hud_shade_${h}`;
+  if (!scene.textures.exists(key)) {
+    const texture = scene.textures.createCanvas(key, 4, h);
+    if (texture) {
+      const ctx = texture.getContext();
+      const fade = ctx.createLinearGradient(0, 0, 0, h);
+      fade.addColorStop(0, "rgba(0, 0, 0, 0.5)");
+      fade.addColorStop(1, "rgba(0, 0, 0, 0)");
+      ctx.fillStyle = fade;
+      ctx.fillRect(0, 0, 4, h);
+      texture.refresh();
+    }
+  }
+  return scene.add.image(0, 0, key).setOrigin(0).setDisplaySize(width, h);
+}
 /** Frosted-glass look shared by the stats pill and the dock. */
 const GLASS_FILL = 0x0a0f16;
 const GLASS_ALPHA = 0.5;
@@ -64,11 +84,7 @@ export class Hud {
     const dockMargin = font * 0.6;
 
     // Header: a soft dark fade so text stays readable over any table.
-    const shade = scene.add.graphics();
-    shade
-      .fillGradientStyle(0x000000, 0x000000, 0x000000, 0x000000, 0.5, 0.5, 0, 0)
-      .fillRect(0, 0, width, headerH * 1.2);
-    this.objects.push(shade);
+    this.objects.push(headerShade(scene, width, headerH * 1.2));
 
     const button = font * 2.7;
     const round = (x: number, icon: IconName, onClick: () => void): Button =>
@@ -99,13 +115,10 @@ export class Hud {
     const pillW = Math.min(width - button * 2 - font * 3, font * 16);
     const pillH = font * 1.9;
     const pillY = font * 3.75;
-    const pill = scene.add.graphics();
-    pill
-      .fillStyle(GLASS_FILL, GLASS_ALPHA)
-      .fillRoundedRect(width / 2 - pillW / 2, pillY - pillH / 2, pillW, pillH, pillH / 2);
-    pill
-      .lineStyle(1, 0xffffff, 0.12)
-      .strokeRoundedRect(width / 2 - pillW / 2, pillY - pillH / 2, pillW, pillH, pillH / 2);
+    const pill = bakedImage(scene, `hud_pill_${Math.round(pillW)}x${Math.round(pillH)}`, pillW + 2, pillH + 2, (g) => {
+      g.fillStyle(GLASS_FILL, GLASS_ALPHA).fillRoundedRect(1, 1, pillW, pillH, pillH / 2);
+      g.lineStyle(1, 0xffffff, 0.12).strokeRoundedRect(1, 1, pillW, pillH, pillH / 2);
+    }).setPosition(width / 2, pillY);
     this.objects.push(pill);
     const chip = (index: number, icon: IconName, color: number = COLORS.text, iconColor = accent): Chip => {
       const x = width / 2 + (index - 1) * (pillW / 3);
@@ -126,10 +139,20 @@ export class Hud {
     // Floating dock.
     const dockW = width - dockMargin * 2;
     const dockTop = height - dockMargin - dockH;
-    const dock = scene.add.graphics();
-    dock.fillStyle(0x000000, 0.25).fillRoundedRect(dockMargin, dockTop + font * 0.2, dockW, dockH, font * 1.3);
-    dock.fillStyle(GLASS_FILL, 0.72).fillRoundedRect(dockMargin, dockTop, dockW, dockH, font * 1.3);
-    dock.lineStyle(1, 0xffffff, 0.12).strokeRoundedRect(dockMargin, dockTop, dockW, dockH, font * 1.3);
+    const drop = font * 0.2;
+    const dock = bakedImage(
+      scene,
+      `hud_dock_${Math.round(dockW)}x${Math.round(dockH)}`,
+      dockW + 2,
+      dockH + drop + 2,
+      (g) => {
+        g.fillStyle(0x000000, 0.25).fillRoundedRect(1, 1 + drop, dockW, dockH, font * 1.3);
+        g.fillStyle(GLASS_FILL, 0.72).fillRoundedRect(1, 1, dockW, dockH, font * 1.3);
+        g.lineStyle(1, 0xffffff, 0.12).strokeRoundedRect(1, 1, dockW, dockH, font * 1.3);
+      }
+    )
+      .setOrigin(0, 0)
+      .setPosition(dockMargin - 1, dockTop - 1);
     this.objects.push(dock);
     const slot = dockW / 4;
     const tool = (index: number, icon: IconName, label: string, onClick: () => void): Button =>
