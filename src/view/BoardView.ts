@@ -2,7 +2,7 @@ import * as Phaser from "phaser";
 import type { Board } from "../core/board";
 import { Fan, type Layout, mirrorLayout, PileKind, type PileSpec } from "../core/layout";
 import type { Rules } from "../core/Rules";
-import { buildCardAtlas } from "./cardAtlas";
+import { buildCardAtlas, releaseCardAtlas } from "./cardAtlas";
 import { CARD_ASPECT, CardView, EFFECT_PADDING_RATIO, GLOW_TEXTURE } from "./CardView";
 import { textStyle } from "./ui";
 
@@ -53,6 +53,8 @@ export class BoardView {
   public readonly cards: CardView[];
   private readonly layouts: readonly Layout[];
   private layout: Layout;
+  /** The atlas the cards currently draw from. */
+  private atlasKey?: string;
   private readonly placeholders: Phaser.GameObjects.Container[] = [];
   private readonly stockBadges = new Map<number, Phaser.GameObjects.Text>();
   private readonly targetGlows: Phaser.GameObjects.Image[] = [];
@@ -108,6 +110,10 @@ export class BoardView {
     };
     const atlas = buildCardAtlas(this.scene, cardW, cardH);
     this.cards.forEach((card) => card.useAtlas(atlas, cardW, cardH));
+    if (this.atlasKey && this.atlasKey !== atlas.key) {
+      releaseCardAtlas(this.scene, this.atlasKey);
+    }
+    this.atlasKey = atlas.key;
     this.drawPlaceholders();
     void this.render(this.board, { animate: false });
   }

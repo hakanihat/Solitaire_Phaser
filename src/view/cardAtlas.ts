@@ -14,9 +14,49 @@ export interface CardAtlas {
 }
 
 const ATLAS_PREFIX = "cards_atlas_";
-/** Menu, loading screen and game each use their own size. */
+/** Unused atlases kept around for reuse (menu, loading screen, game). */
 const MAX_ATLASES = 4;
+/** Atlas keys, least recently used first. */
 const recent: string[] = [];
+/**
+ * Atlases each running scene draws with. These are never evicted: removing
+ * a texture that live sprites still use breaks every later render.
+ */
+const inUse = new Map<Phaser.Scene, Set<string>>();
+
+function markUsed(scene: Phaser.Scene, key: string): void {
+  let keys = inUse.get(scene);
+  if (!keys) {
+    keys = new Set();
+    inUse.set(scene, keys);
+    scene.events.once(Phaser.Scenes.Events.SHUTDOWN, () => inUse.delete(scene));
+  }
+  keys.add(key);
+  const index = recent.indexOf(key);
+  if (index >= 0) {
+    recent.splice(index, 1);
+  }
+  recent.push(key);
+}
+
+/** Frees the least recently used atlases that no running scene needs. */
+function evictUnused(textures: Phaser.Textures.TextureManager): void {
+  const needed = new Set([...inUse.values()].flatMap((keys) => [...keys]));
+  for (let i = 0; recent.length > MAX_ATLASES && i < recent.length;) {
+    const key = recent[i];
+    if (needed.has(key)) {
+      i += 1;
+    } else {
+      recent.splice(i, 1);
+      textures.remove(key);
+    }
+  }
+}
+
+/** Tells the cache `scene` no longer draws with atlas `key` (e.g. after a resize). */
+export function releaseCardAtlas(scene: Phaser.Scene, key: string): void {
+  inUse.get(scene)?.delete(key);
+}
 /** Atlas grid; 8 × 7 = 56 cells keeps the texture roughly square. */
 const COLUMNS = 8;
 const ROWS = 7;
@@ -81,6 +121,7 @@ export function buildCardAtlas(scene: Phaser.Scene, cardWidth: number, cardHeigh
   const key = `${ATLAS_PREFIX}${width}x${height}`;
   const atlas: CardAtlas = { key, width, height, pad };
   if (scene.textures.exists(key)) {
+    markUsed(scene, key);
     return atlas;
   }
 
@@ -126,12 +167,8 @@ export function buildCardAtlas(scene: Phaser.Scene, cardWidth: number, cardHeigh
   texture.refresh();
   texture.setFilter(Phaser.Textures.FilterMode.LINEAR);
 
-  // Keep only the most recent few sizes (menu, loading screen, game).
-  recent.push(key);
-  while (recent.length > MAX_ATLASES) {
-    const stale = recent.shift() as string;
-    scene.time.delayedCall(0, () => scene.textures.remove(stale));
-  }
+  markUsed(scene, key);
+  evictUnused(scene.textures);
   return atlas;
 }
 
