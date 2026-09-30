@@ -1,6 +1,7 @@
 import * as Phaser from "phaser";
 import { rgba } from "./color";
 import { drawIcon, type IconName } from "./icons";
+import { smoothMotion } from "./pixelSnap";
 
 export const FONT_FAMILY = '"Nunito", "Segoe UI", "Roboto", "Helvetica Neue", Arial, sans-serif';
 
@@ -147,6 +148,33 @@ function buttonSkin(
 }
 
 /**
+ * A soft glowing outline in the button's shape, used for the "look here"
+ * pulse. It is blurry by design, so scaling it up never looks pixelated.
+ */
+function haloSkin(scene: Phaser.Scene, width: number, height: number, accent: number): string {
+  const w = Math.round(width);
+  const h = Math.round(height);
+  const key = `btn_halo_${accent.toString(16)}_${w}x${h}`;
+  if (scene.textures.exists(key)) {
+    return key;
+  }
+  const pad = Math.ceil(h * 0.45);
+  const texture = scene.textures.createCanvas(key, w + pad * 2, h + pad * 2);
+  if (!texture) {
+    return key;
+  }
+  const ctx = texture.getContext();
+  ctx.shadowColor = hex(accent);
+  ctx.shadowBlur = h * 0.3;
+  ctx.lineWidth = Math.max(2, h * 0.08);
+  ctx.strokeStyle = rgba(shade(accent, 0.25), 0.9);
+  pillPath(ctx, pad, pad, w, h);
+  ctx.stroke();
+  texture.refresh();
+  return key;
+}
+
+/**
  * Glossy button with an optional icon. Gives immediate press feedback
  * (squash on press, spring back on release) and only fires when the pointer
  * is released over the button, so drags that start on a button are harmless.
@@ -158,11 +186,14 @@ export class Button extends Phaser.GameObjects.Container {
   private readonly bubble?: Phaser.GameObjects.Arc;
   private enabled = true;
   private pressed = false;
+  private readonly accent: number;
+  private halo?: Phaser.GameObjects.Image;
   private pulseTween?: Phaser.Tweens.Tween;
 
   public constructor(scene: Phaser.Scene, x: number, y: number, options: ButtonOptions) {
     super(scene, x, y);
     const { width, height, label, icon, accent, fontSize } = options;
+    this.accent = accent;
     const style = options.style ?? "ghost";
     if (style !== "toolbar") {
       this.add(scene.add.image(0, 0, buttonSkin(scene, style, width, height, accent)));
@@ -204,6 +235,8 @@ export class Button extends Phaser.GameObjects.Container {
       }
     });
     scene.add.existing(this);
+    // Sub-pixel rendering while squashed, so the parts don't jitter apart.
+    smoothMotion(this, () => this.scaleX !== 1);
   }
 
   public setEnabled(enabled: boolean): this {
@@ -217,19 +250,25 @@ export class Button extends Phaser.GameObjects.Container {
     return this;
   }
 
-  /** A gentle breathing animation that draws the eye (e.g. Auto finish). */
+  /**
+   * Draws the eye (e.g. Auto finish): a glow ripples out from behind the
+   * button. The button itself never scales, so it stays crisp and steady.
+   */
   public setPulse(on: boolean): this {
     this.pulseTween?.stop();
     this.pulseTween = undefined;
-    this.setScale(1);
+    this.halo?.destroy();
+    this.halo = undefined;
     if (on) {
+      this.halo = smoothMotion(this.scene.add.image(0, 0, haloSkin(this.scene, this.width, this.height, this.accent)));
+      this.addAt(this.halo, 0);
       this.pulseTween = this.scene.tweens.add({
-        targets: this,
-        scale: 1.08,
-        duration: 520,
-        yoyo: true,
+        targets: this.halo,
+        scale: { from: 0.96, to: 1.22 },
+        alpha: { from: 0.85, to: 0 },
+        duration: 1400,
         repeat: -1,
-        ease: "Sine.easeInOut",
+        ease: "Cubic.easeOut",
       });
     }
     return this;
@@ -237,7 +276,7 @@ export class Button extends Phaser.GameObjects.Container {
 
   private press(down: boolean): void {
     this.pressed = down && this.enabled;
-    if (!this.enabled || this.pulseTween) {
+    if (!this.enabled) {
       return;
     }
     this.scene.tweens.add({

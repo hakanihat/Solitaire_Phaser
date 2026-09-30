@@ -185,6 +185,7 @@ export class MenuScene extends Phaser.Scene {
     const radius = font * 1;
     const resume = (): void => this.launch({ variant: variant.id, difficulty: saved.difficulty, resume: true });
     const card = this.add.container(width / 2, y + h / 2 + font * 0.2);
+    smoothMotion(card, () => card.scaleX !== 1);
     const shadowBox = this.add
       .graphics()
       .fillStyle(0x000000, 0.35)
@@ -304,6 +305,7 @@ export class MenuScene extends Phaser.Scene {
     font: number
   ): Phaser.GameObjects.Container {
     const tile = this.add.container(x, y);
+    smoothMotion(tile, () => tile.scaleX !== 1 || tile.y !== y);
     const { accent } = variant.theme;
     const radius = font * 0.8;
     // Each tile is the game's own table with an illustrated scene of the game.
