@@ -2,7 +2,7 @@ import type * as Phaser from "phaser";
 import { createRng, type Rng } from "../core/random";
 import type { Pattern, VariantTheme } from "../core/variant";
 import { rgba } from "./color";
-import { paintEmblem } from "./emblems";
+import { paintBackdrop, paintEmblem } from "./emblems";
 
 type PatternPainter = (ctx: CanvasRenderingContext2D, w: number, h: number, rng: Rng, unit: number) => void;
 
@@ -169,6 +169,8 @@ export interface TableOptions {
   readonly frame?: FrameStyle;
   /** Paint the game's illustrated scene (menu tiles). */
   readonly emblem?: boolean;
+  /** Paint the game's scene faintly across the lower table (full-screen tables). */
+  readonly backdrop?: boolean;
 }
 
 /**
@@ -189,7 +191,8 @@ export function paintTable(
   options: TableOptions = {}
 ): string {
   const emblem = options.emblem ? theme.emblem : undefined;
-  const key = [`table_${id}_${Math.round(width)}x${Math.round(height)}`, options.frame, emblem]
+  const backdrop = options.backdrop ? theme.emblem : undefined;
+  const key = [`table_${id}_${Math.round(width)}x${Math.round(height)}`, options.frame, emblem, backdrop && "backdrop"]
     .filter(Boolean)
     .join("_");
   if (scene.textures.exists(key)) {
@@ -227,6 +230,9 @@ export function paintTable(
   }
   if (emblem) {
     paintEmblem(ctx, emblem, width, height, theme);
+  }
+  if (backdrop) {
+    paintBackdrop(ctx, backdrop, width, height, theme);
   }
 
   // 3. A gentle spotlight where the cards are.
@@ -341,7 +347,7 @@ export function coverTable(
   frame: FrameStyle = "ornate"
 ): Phaser.GameObjects.Image {
   const { width, height } = scene.scale;
-  const key = paintTable(scene, theme, id, width, height, { frame });
+  const key = paintTable(scene, theme, id, width, height, { frame, backdrop: true });
   pruneTables(scene, key);
   const target = image ?? scene.add.image(0, 0, key).setDepth(-10);
   return target.setTexture(key).setOrigin(0).setPosition(0, 0);

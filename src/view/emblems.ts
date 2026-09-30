@@ -1079,6 +1079,50 @@ const EMBLEMS: Readonly<Record<Emblem, EmblemPainter>> = {
   twins,
 };
 
+/** Tile proportions the scenes are composed for (width / height). */
+const SCENE_ASPECT = 1.45;
+/** Backdrop strength: present, but always quieter than the cards. */
+const BACKDROP_ALPHA = 0.42;
+
+/**
+ * Paints a game's scene faintly across the lower part of a full-screen
+ * table, fading into the felt at its top and sides, so every game's table
+ * has its own look without drawing the eye away from the cards.
+ */
+export function paintBackdrop(
+  ctx: CanvasRenderingContext2D,
+  emblem: Emblem,
+  w: number,
+  h: number,
+  theme: VariantTheme
+): void {
+  const boxH = Math.round(Math.min(h * 0.42, w / SCENE_ASPECT));
+  const boxW = Math.round(boxH * SCENE_ASPECT);
+  const canvas = document.createElement("canvas");
+  canvas.width = boxW;
+  canvas.height = boxH;
+  const scene = canvas.getContext("2d") as CanvasRenderingContext2D;
+  EMBLEMS[emblem]({ ctx: scene, u: boxH, width: SCENE_ASPECT, theme });
+  // Melt the picture's edges into the table.
+  scene.globalCompositeOperation = "destination-in";
+  const sides = scene.createLinearGradient(0, 0, boxW, 0);
+  sides.addColorStop(0, "rgba(0,0,0,0)");
+  sides.addColorStop(0.2, "rgba(0,0,0,1)");
+  sides.addColorStop(0.8, "rgba(0,0,0,1)");
+  sides.addColorStop(1, "rgba(0,0,0,0)");
+  scene.fillStyle = sides;
+  scene.fillRect(0, 0, boxW, boxH);
+  const top = scene.createLinearGradient(0, 0, 0, boxH);
+  top.addColorStop(0, "rgba(0,0,0,0)");
+  top.addColorStop(0.35, "rgba(0,0,0,1)");
+  scene.fillStyle = top;
+  scene.fillRect(0, 0, boxW, boxH);
+  ctx.save();
+  ctx.globalAlpha = BACKDROP_ALPHA;
+  ctx.drawImage(canvas, Math.round((w - boxW) / 2), h - boxH);
+  ctx.restore();
+}
+
 /** Paints a game's scene over its table background (`w` × `h` pixels). */
 export function paintEmblem(
   ctx: CanvasRenderingContext2D,
