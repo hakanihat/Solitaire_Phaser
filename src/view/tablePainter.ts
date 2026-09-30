@@ -252,12 +252,18 @@ export function paintTable(
   return key;
 }
 
+/**
+ * Table frame geometry, in table units (1/90 of the short screen side). The
+ * frame hugs the screen edge so the cards inside it can be as wide as possible.
+ */
+const FRAME = { outer: 0.45, inner: 0.8, ornament: 2.2 } as const;
+
 /** Distance from the screen edge to the table frame's inner line. */
-export const tableFrameInset = (width: number, height: number): number => (Math.min(width, height) / 90) * 1.6 * 1.6;
+export const tableFrameInset = (width: number, height: number): number => (Math.min(width, height) / 90) * FRAME.inner;
 
 /** A card-table border: a double inset line with a suit ornament in each corner. */
 function paintFrame(ctx: CanvasRenderingContext2D, w: number, h: number, unit: number, accent: number): void {
-  const inset = unit * 1.6;
+  const inset = unit * FRAME.outer;
   const radius = unit * 3;
   ctx.save();
   ctx.lineWidth = Math.max(1, unit * 0.22);
@@ -266,17 +272,19 @@ function paintFrame(ctx: CanvasRenderingContext2D, w: number, h: number, unit: n
   ctx.stroke();
   ctx.lineWidth = Math.max(1, unit * 0.12);
   ctx.strokeStyle = rgba(accent, 0.16);
-  roundedPath(ctx, inset * 1.6, inset * 1.6, w - inset * 3.2, h - inset * 3.2, radius * 0.8);
+  const inner = unit * FRAME.inner;
+  roundedPath(ctx, inner, inner, w - inner * 2, h - inner * 2, radius * 0.9);
   ctx.stroke();
   ctx.fillStyle = rgba(accent, 0.28);
   ctx.font = `${Math.round(unit * 2.4)}px serif`;
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
+  const c = unit * FRAME.ornament;
   const corners: [number, number][] = [
-    [inset * 2.9, inset * 2.9],
-    [w - inset * 2.9, inset * 2.9],
-    [w - inset * 2.9, h - inset * 2.9],
-    [inset * 2.9, h - inset * 2.9],
+    [c, c],
+    [w - c, c],
+    [w - c, h - c],
+    [c, h - c],
   ];
   corners.forEach(([x, y], i) => ctx.fillText(SUIT_ORNAMENTS[i], x, y));
   ctx.restore();

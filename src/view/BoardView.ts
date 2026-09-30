@@ -3,6 +3,7 @@ import type { Board } from "../core/board";
 import { Fan, type Layout, mirrorLayout, PileKind, type PileSpec } from "../core/layout";
 import type { Rules } from "../core/Rules";
 import { buildCardAtlas, releaseCardAtlas } from "./cardAtlas";
+import { tableFrameInset } from "./tablePainter";
 import { CARD_ASPECT, CardView, EFFECT_PADDING_RATIO, GLOW_TEXTURE } from "./CardView";
 import { textStyle } from "./ui";
 
@@ -91,7 +92,9 @@ export class BoardView {
 
   /** Recomputes card size and positions for a new screen area. */
   public resize(area: Area): void {
-    const margin = area.width * 0.018;
+    // Cards fill the table right up to the frame, with a hairline of air.
+    const { width, height } = this.scene.scale;
+    const margin = tableFrameInset(width, height) + area.width * 0.0035;
     // Use the arrangement that gives the biggest cards on this screen.
     const fitted = this.layouts
       .map((layout) => ({ layout, cardW: this.fitCardWidth(layout, area, margin) }))
