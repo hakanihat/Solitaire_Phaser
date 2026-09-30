@@ -8,6 +8,7 @@ import { chooseTapMove, movesFrom } from "../core/tapMove";
 import type { VariantDefinition } from "../core/variant";
 import { playSfx } from "../services/audio";
 import { haptic } from "../services/haptics";
+import { INPUT_RESET } from "../services/lifecycle";
 import { type Settings, storage } from "../services/storage";
 import { getVariant } from "../variants";
 import { type Area, BoardView, DEPTH_DRAGGING } from "../view/BoardView";
@@ -140,6 +141,7 @@ export class GameScene extends Phaser.Scene {
     this.input.on(Phaser.Input.Events.POINTER_MOVE, this.onPointerMove, this);
     this.input.on(Phaser.Input.Events.POINTER_UP, this.onPointerUp, this);
     this.scale.on(Phaser.Scale.Events.RESIZE, this.onResize, this);
+    this.game.events.on(INPUT_RESET, this.onInputReset, this);
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, this.onShutdown, this);
     this.cameras.main.fadeIn(250, 0, 0, 0);
   }
@@ -188,6 +190,7 @@ export class GameScene extends Phaser.Scene {
     this.input.off(Phaser.Input.Events.POINTER_MOVE, this.onPointerMove, this);
     this.input.off(Phaser.Input.Events.POINTER_UP, this.onPointerUp, this);
     this.scale.off(Phaser.Scale.Events.RESIZE, this.onResize, this);
+    this.game.events.off(INPUT_RESET, this.onInputReset, this);
     this.boardView.destroy();
     this.hud.destroy();
   }
@@ -502,6 +505,12 @@ export class GameScene extends Phaser.Scene {
       }
     });
     return (best as { move: Move } | null)?.move ?? null;
+  }
+
+  /** The app lost the touch in progress (e.g. it went to the background). */
+  private onInputReset(): void {
+    this.pendingTap = null;
+    this.cancelDrag();
   }
 
   private cancelDrag(): void {

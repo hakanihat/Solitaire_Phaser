@@ -3,6 +3,7 @@ import { BootScene } from "./scenes/BootScene";
 import { GameScene } from "./scenes/GameScene";
 import { LoadingScene } from "./scenes/LoadingScene";
 import { MenuScene } from "./scenes/MenuScene";
+import { setupLifecycle } from "./services/lifecycle";
 import { setupPlatform } from "./services/platform";
 import { DPR, trackViewport, viewportSize } from "./view/viewport";
 
@@ -23,6 +24,7 @@ const game = new Phaser.Game({
 });
 
 trackViewport(game);
+setupLifecycle(game);
 void setupPlatform(game);
 
 if (import.meta.env.DEV) {

@@ -2,6 +2,7 @@ import * as Phaser from "phaser";
 import { createCards, Suit } from "../core/cards";
 import { DIFFICULTIES, type Difficulty } from "../core/Rules";
 import type { VariantDefinition, VariantTheme } from "../core/variant";
+import { INPUT_RESET } from "../services/lifecycle";
 import { storage } from "../services/storage";
 import { VARIANTS } from "../variants";
 import { cardImage } from "../view/cardAtlas";
@@ -485,6 +486,12 @@ export class MenuScene extends Phaser.Scene {
     this.page.setMask(clip.createGeometryMask());
     const minY = Math.min(0, height - inset * 1.5 - this.pageHeight);
     const clampY = (value: number): number => Phaser.Math.Clamp(value, minY, 0);
+    // A scroll interrupted by an app switch must not resume on the next touch.
+    const dropGesture = (): void => {
+      this.dragStart = null;
+    };
+    this.game.events.on(INPUT_RESET, dropGesture);
+    this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => this.game.events.off(INPUT_RESET, dropGesture));
     this.input.on(Phaser.Input.Events.POINTER_DOWN, (pointer: Phaser.Input.Pointer) => {
       if (this.overlayOpen()) {
         return;
