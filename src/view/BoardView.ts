@@ -94,7 +94,7 @@ export class BoardView {
   public resize(area: Area): void {
     // Cards fill the table right up to the frame, with a hairline of air.
     const { width, height } = this.scene.scale;
-    const margin = tableFrameInset(width, height) + area.width * 0.0035;
+    const margin = tableFrameInset(width, height, "edge") + area.width * 0.0035;
     // Use the arrangement that gives the biggest cards on this screen.
     const fitted = this.layouts
       .map((layout) => ({ layout, cardW: this.fitCardWidth(layout, area, margin) }))

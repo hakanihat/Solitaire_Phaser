@@ -156,7 +156,8 @@ export class GameScene extends Phaser.Scene {
   }
 
   private buildChrome(): void {
-    this.background = coverTable(this, this.variant.theme, this.variant.id, this.background);
+    // The game table's frame hugs the screen edge to leave the cards more room.
+    this.background = coverTable(this, this.variant.theme, this.variant.id, this.background, "edge");
     this.ambient?.destroy();
     this.ambient = addAmbient(this, this.variant.theme, 16 * uiScale(this));
     this.hud?.destroy();

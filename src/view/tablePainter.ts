@@ -167,9 +167,16 @@ const PATTERNS: Record<Pattern, PatternPainter> = {
 export interface TableOptions {
   /** Round the corners (menu tiles). */
   readonly cornerRadius?: number;
-  /** Draw the decorative inset frame with suit ornaments (full-screen tables). */
-  readonly frame?: boolean;
+  /** Draw a decorative frame with suit ornaments (full-screen tables). */
+  readonly frame?: FrameStyle;
 }
+
+/**
+ * `ornate`: a wide inset border for the menu and loading screens.
+ * `edge`: the same border pulled to the screen edge, so a game's cards
+ * can use as much of the width as possible.
+ */
+export type FrameStyle = "ornate" | "edge";
 
 const SUIT_ORNAMENTS = ["♠", "♥", "♣", "♦"];
 
@@ -181,7 +188,7 @@ export function paintTable(
   height: number,
   options: TableOptions = {}
 ): string {
-  const key = `table_${id}_${Math.round(width)}x${Math.round(height)}`;
+  const key = `table_${id}_${Math.round(width)}x${Math.round(height)}${options.frame ? `_${options.frame}` : ""}`;
   if (scene.textures.exists(key)) {
     return key;
   }
@@ -245,25 +252,40 @@ export function paintTable(
   ctx.fillRect(0, 0, width, height);
 
   if (options.frame) {
-    paintFrame(ctx, width, height, unit, theme.accent);
+    paintFrame(ctx, width, height, unit, theme.accent, FRAMES[options.frame]);
   }
 
   texture.refresh();
   return key;
 }
 
-/**
- * Table frame geometry, in table units (1/90 of the short screen side). The
- * frame hugs the screen edge so the cards inside it can be as wide as possible.
- */
-const FRAME = { outer: 0.45, inner: 0.8, ornament: 2.2 } as const;
+interface FrameGeometry {
+  /** Outer and inner border lines and corner ornaments, in table units. */
+  readonly outer: number;
+  readonly inner: number;
+  readonly ornament: number;
+}
+
+/** Frame geometry per style, in table units (1/90 of the short screen side). */
+const FRAMES: Readonly<Record<FrameStyle, FrameGeometry>> = {
+  ornate: { outer: 1.6, inner: 2.56, ornament: 4.64 },
+  edge: { outer: 0.45, inner: 0.8, ornament: 2.2 },
+};
 
 /** Distance from the screen edge to the table frame's inner line. */
-export const tableFrameInset = (width: number, height: number): number => (Math.min(width, height) / 90) * FRAME.inner;
+export const tableFrameInset = (width: number, height: number, style: FrameStyle = "ornate"): number =>
+  (Math.min(width, height) / 90) * FRAMES[style].inner;
 
 /** A card-table border: a double inset line with a suit ornament in each corner. */
-function paintFrame(ctx: CanvasRenderingContext2D, w: number, h: number, unit: number, accent: number): void {
-  const inset = unit * FRAME.outer;
+function paintFrame(
+  ctx: CanvasRenderingContext2D,
+  w: number,
+  h: number,
+  unit: number,
+  accent: number,
+  frame: FrameGeometry
+): void {
+  const inset = unit * frame.outer;
   const radius = unit * 3;
   ctx.save();
   ctx.lineWidth = Math.max(1, unit * 0.22);
@@ -272,14 +294,14 @@ function paintFrame(ctx: CanvasRenderingContext2D, w: number, h: number, unit: n
   ctx.stroke();
   ctx.lineWidth = Math.max(1, unit * 0.12);
   ctx.strokeStyle = rgba(accent, 0.16);
-  const inner = unit * FRAME.inner;
-  roundedPath(ctx, inner, inner, w - inner * 2, h - inner * 2, radius * 0.9);
+  const inner = unit * frame.inner;
+  roundedPath(ctx, inner, inner, w - inner * 2, h - inner * 2, radius * 0.8);
   ctx.stroke();
   ctx.fillStyle = rgba(accent, 0.28);
   ctx.font = `${Math.round(unit * 2.4)}px serif`;
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
-  const c = unit * FRAME.ornament;
+  const c = unit * frame.ornament;
   const corners: [number, number][] = [
     [c, c],
     [w - c, c],
@@ -309,10 +331,11 @@ export function coverTable(
   scene: Phaser.Scene,
   theme: VariantTheme,
   id: string,
-  image?: Phaser.GameObjects.Image
+  image?: Phaser.GameObjects.Image,
+  frame: FrameStyle = "ornate"
 ): Phaser.GameObjects.Image {
   const { width, height } = scene.scale;
-  const key = paintTable(scene, theme, id, width, height, { frame: true });
+  const key = paintTable(scene, theme, id, width, height, { frame });
   pruneTables(scene, key);
   const target = image ?? scene.add.image(0, 0, key).setDepth(-10);
   return target.setTexture(key).setOrigin(0).setPosition(0, 0);
