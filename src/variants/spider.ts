@@ -1,6 +1,6 @@
 import { type Board, createBoard, transferCards } from "../core/board";
 import { anySuitDown, isRun, sameSuitDown } from "../core/building";
-import { createCards, Suit } from "../core/cards";
+import { createCards, KING, Suit } from "../core/cards";
 import { type Layout, PileKind } from "../core/layout";
 import type { Move } from "../core/moves";
 import { type Difficulty, Rules } from "../core/Rules";
@@ -92,6 +92,72 @@ export class SpiderRules extends Rules {
 
   public override drawBlockedReason(board: Board): string {
     return board.piles[STOCK].length > 0 ? "Every column needs a card before you can deal." : "The stock is empty.";
+  }
+
+  /**
+   * The deal needs a card in every column. Rather than make the player fill
+   * the gaps by hand, pick legal moves that fill them while breaking as
+   * little as possible: whole runs, preferably ones that uncover a face-down
+   * card or are headed by a King (which can only ever go to an empty column).
+   */
+  public override prepareDraw(board: Board): Move[] | null {
+    if (board.piles[STOCK].length === 0) {
+      return null;
+    }
+    const moves: Move[] = [];
+    let current = board;
+    for (let empty = this.emptyColumn(current); empty !== undefined; empty = this.emptyColumn(current)) {
+      const move = this.bestFill(current, empty);
+      if (!move) {
+        return null;
+      }
+      moves.push(move);
+      current = this.apply(current, move);
+    }
+    return moves.length > 0 ? moves : null;
+  }
+
+  private emptyColumn(board: Board): number | undefined {
+    return this.tableau.find((pile) => board.piles[pile].length === 0);
+  }
+
+  /** The least disruptive legal move into the empty column `to`. */
+  private bestFill(board: Board, to: number): Move | null {
+    let best: { move: Move; score: number } | null = null;
+    for (const from of this.tableau) {
+      const length = board.piles[from].length;
+      if (from === to || length < 2) {
+        continue;
+      }
+      // The longest movable run at the bottom of the column.
+      let start = length - 1;
+      while (start > board.hidden[from] && this.canPick(board, from, start - 1)) {
+        start -= 1;
+      }
+      // Moving a whole column would only open another gap, so split it
+      // instead, as a last resort.
+      const splits = start === 0;
+      const index = splits ? length - 1 : start;
+      const move: Move = { kind: "move", from, to, count: length - index };
+      if (!this.isLegal(board, move)) {
+        continue;
+      }
+      const head = this.cardAt(board, from, index);
+      const below = index - 1;
+      let score = splits ? -20 : 0;
+      if (below < board.hidden[from]) {
+        score += 10;
+      } else if (this.cardAt(board, from, below).rank === head.rank + 1) {
+        score -= 4;
+      }
+      if (head.rank === KING) {
+        score += 6;
+      }
+      if (!best || score > best.score) {
+        best = { move, score };
+      }
+    }
+    return best?.move ?? null;
   }
 
   protected override performDraw(board: Board): void {

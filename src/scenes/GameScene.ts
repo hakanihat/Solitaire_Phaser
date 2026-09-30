@@ -528,6 +528,11 @@ export class GameScene extends Phaser.Scene {
     if (tap.kind === "stock") {
       if (this.rules.canDraw(board)) {
         void this.perform({ kind: "draw" });
+        return;
+      }
+      const fill = this.rules.prepareDraw(board);
+      if (fill) {
+        void this.fillAndDraw(fill);
       } else {
         playSfx(this, "invalid");
         this.showToast(this.rules.drawBlockedReason(board));
@@ -577,6 +582,31 @@ export class GameScene extends Phaser.Scene {
       playSfx(this, "invalid");
       haptic("invalid");
       this.boardView.cardsFrom(card.pile, card.index).forEach((c) => c.shake());
+    }
+  }
+
+  /**
+   * Spider deals only when every column has a card: fill the gaps with the
+   * suggested legal moves, then deal. One undo takes all of it back (the
+   * first move counts as the player's, the rest as automatic).
+   */
+  private async fillAndDraw(fill: readonly Move[]): Promise<void> {
+    this.showToast("Filling the empty columns, then dealing…", 1800);
+    this.busy = true;
+    try {
+      for (const [i, move] of fill.entries()) {
+        if (!(await this.perform(move, { auto: i > 0 }))) {
+          return;
+        }
+      }
+      if (this.rules.canDraw(this.session.board)) {
+        await this.perform({ kind: "draw" }, { auto: true });
+      }
+    } finally {
+      this.busy = false;
+      if (!this.won) {
+        this.afterBoardChange();
+      }
     }
   }
 

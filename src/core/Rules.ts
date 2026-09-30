@@ -74,6 +74,15 @@ export abstract class Rules {
     return false;
   }
 
+  /**
+   * When a house rule blocks the stock (Spider won't deal onto an empty
+   * column), legal moves that would unblock it, so the game can make them
+   * for the player. `null` when there's no such help.
+   */
+  public prepareDraw(_board: Board): Move[] | null {
+    return null;
+  }
+
   /** Explains to the player why tapping the stock does nothing right now. */
   public drawBlockedReason(board: Board): string {
     const stock = this.pilesOf(PileKind.Stock)[0];

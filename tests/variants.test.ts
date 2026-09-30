@@ -166,3 +166,31 @@ describe("locked cards", () => {
     }
   });
 });
+
+describe("spider deal helper", () => {
+  it("fills empty columns with legal moves so the deal can go ahead", async () => {
+    const { transferCards } = await import("../src/core/board");
+    const rules = VARIANTS.find((variant) => variant.id === "spider")!.createRules("medium");
+    const board = rules.deal(4242);
+    const tableau = rules.pilesOf(PileKind.Tableau);
+    // Empty the first two columns by stacking their cards onto the third.
+    for (const pile of tableau.slice(0, 2)) {
+      board.hidden[pile] = 0;
+      transferCards(board, pile, tableau[2], board.piles[pile].length);
+    }
+    expect(rules.canDraw(board)).toBe(false);
+    const fill = rules.prepareDraw(board);
+    expect(fill).not.toBeNull();
+    let current = board;
+    for (const move of fill ?? []) {
+      expect(rules.isLegal(current, move)).toBe(true);
+      current = rules.apply(current, move);
+    }
+    expect(rules.canDraw(current)).toBe(true);
+  });
+
+  it("offers nothing when drawing isn't blocked by empty columns", () => {
+    const rules = VARIANTS.find((variant) => variant.id === "spider")!.createRules("easy");
+    expect(rules.prepareDraw(rules.deal(7))).toBeNull();
+  });
+});
