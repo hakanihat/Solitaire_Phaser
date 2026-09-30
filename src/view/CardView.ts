@@ -275,6 +275,11 @@ export class CardView extends Phaser.GameObjects.Sprite {
 
   /** Side-to-side wiggle meaning "that move isn't allowed". */
   public shake(): void {
+    // A travelling card doesn't wiggle: the shake would fight the trip for
+    // `x` and could strand the card where the shake began.
+    if (this.arrival) {
+      return;
+    }
     const x = this.x;
     this.scene.tweens.add({
       targets: this,

@@ -395,12 +395,15 @@ export class GameScene extends Phaser.Scene {
       return;
     }
     const board = this.session.board;
-    const card = this.boardView.cardAt(pointer.x, pointer.y);
+    // The stock's spot always means "draw", even while a card just drawn
+    // from it is still flying out over it (fast repeated taps).
     const stockPile = this.rules.pilesOf(PileKind.Stock)[0];
+    if (stockPile !== undefined && this.boardView.pileAt(pointer.x, pointer.y) === stockPile) {
+      this.pendingTap = { kind: "stock" };
+      return;
+    }
+    const card = this.boardView.cardAt(pointer.x, pointer.y);
     if (!card) {
-      if (stockPile !== undefined && this.boardView.pileAt(pointer.x, pointer.y) === stockPile) {
-        this.pendingTap = { kind: "stock" };
-      }
       return;
     }
     if (card.pile === stockPile) {

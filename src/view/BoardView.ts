@@ -149,6 +149,11 @@ export class BoardView {
         if (!animate || distance < 0.5) {
           if (!animate) {
             card.settle();
+          } else if (this.scene.tweens.isTweening(card)) {
+            // Already in place, but an earlier render may still have a
+            // (possibly delayed) trip queued for it; cancel it, or it would
+            // later carry the card away from where the board says it is.
+            card.settle(true);
           }
           card.setPosition(target.x, target.y).setDepth(depth);
           card.setFaceUp(faceUp, animate);
