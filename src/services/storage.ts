@@ -10,6 +10,8 @@ export interface Settings {
   showTimer: boolean;
   /** Short vibrations on moves (touch devices). */
   vibration: boolean;
+  /** Grey out face-up cards that can't be played right now. */
+  dimLocked: boolean;
 }
 
 export interface Stats {
@@ -41,6 +43,7 @@ const DEFAULT_SETTINGS: Settings = {
   leftHanded: false,
   showTimer: true,
   vibration: true,
+  dimLocked: true,
 };
 
 const EMPTY_STATS: Stats = {

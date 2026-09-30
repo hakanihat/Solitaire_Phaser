@@ -56,6 +56,8 @@ export class BoardView {
   private layout: Layout;
   /** The atlas the cards currently draw from. */
   private atlasKey?: string;
+  /** Grey out face-up cards that can't be played (a setting). */
+  private dimLocked = true;
   private readonly placeholders: Phaser.GameObjects.Container[] = [];
   private readonly stockBadges = new Map<number, Phaser.GameObjects.Text>();
   private readonly targetGlows: Phaser.GameObjects.Image[] = [];
@@ -121,6 +123,14 @@ export class BoardView {
     void this.render(this.board, { animate: false });
   }
 
+  /** Turns greying out of unplayable cards on or off. */
+  public setDimLocked(enabled: boolean): void {
+    this.dimLocked = enabled;
+    this.board.piles.forEach((pile, pileIndex) =>
+      pile.forEach((id, index) => this.cards[id].setDimmed(this.lockedAt(this.board, pileIndex, index), true))
+    );
+  }
+
   /** Moves every card to where `board` says it belongs. Resolves when done. */
   public render(board: Board, options: RenderOptions = {}): Promise<void> {
     this.board = board;
@@ -132,6 +142,7 @@ export class BoardView {
       target: Phaser.Math.Vector2;
       depth: number;
       faceUp: boolean;
+      locked: boolean;
       distance: number;
     }[] = [];
 
@@ -143,6 +154,7 @@ export class BoardView {
         const target = positions[index];
         const depth = this.depthFor(spec, index);
         const faceUp = spec.kind !== PileKind.Stock && index >= board.hidden[pileIndex];
+        const locked = this.lockedAt(board, pileIndex, index);
         card.pile = pileIndex;
         card.index = index;
         const distance = Phaser.Math.Distance.Between(card.x, card.y, target.x, target.y);
@@ -157,12 +169,13 @@ export class BoardView {
           }
           card.setPosition(target.x, target.y).setDepth(depth);
           card.setFaceUp(faceUp, animate);
+          card.setDimmed(locked, animate);
           if (animate) {
             card.restPose();
           }
           return;
         }
-        journeys.push({ card, target, depth, faceUp, distance });
+        journeys.push({ card, target, depth, faceUp, locked, distance });
       });
     });
 
@@ -172,12 +185,13 @@ export class BoardView {
     }
     // Only real trips take a turn in the stagger; tiny nudges start at once.
     let order = 0;
-    const tweens = journeys.map(({ card, target, depth, faceUp, distance }) => {
+    const tweens = journeys.map(({ card, target, depth, faceUp, locked, distance }) => {
       const long = distance > this.geometry.cardW * 0.3;
       const delay = long ? order * stagger : 0;
       order += long ? 1 : 0;
       const moving = this.tweenCard(card, target, depth, delay, speed, distance);
       card.setFaceUp(faceUp, animate, delay + 60 * speed);
+      card.setDimmed(locked, animate);
       return moving;
     });
     this.updatePlaceholders(board);
@@ -321,6 +335,22 @@ export class BoardView {
     const moving = card.moveTo(target.x, target.y, { duration, delay, depth });
     card.setDepth(DEPTH_MOVING + depth);
     return moving;
+  }
+
+  /**
+   * Whether a card is greyed out: face-up, in play (tableau, pyramid slots,
+   * or under the waste's top card) and unable to move right now.
+   */
+  private lockedAt(board: Board, pile: number, index: number): boolean {
+    if (!this.dimLocked || index < board.hidden[pile]) {
+      return false;
+    }
+    const kind = this.layout.piles[pile].kind;
+    const inPlay =
+      kind === PileKind.Tableau ||
+      kind === PileKind.Slot ||
+      (kind === PileKind.Waste && index < board.piles[pile].length - 1);
+    return inPlay && this.rules.isLocked(board, pile, index);
   }
 
   private pileBase(pile: number): Phaser.Math.Vector2 {

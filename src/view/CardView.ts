@@ -12,6 +12,8 @@ export const CARD_ASPECT = 360 / (3510 / 14);
 
 export const GLOW_TEXTURE = "card_glow";
 
+/** Grey level (0–255) a locked card is tinted to: clearly "out of play", still readable. */
+const LOCKED_GREY = 158;
 /** How much bigger a lifted card gets (1 = +100%). */
 const LIFT_SCALE = 0.07;
 /** How much a card bulges vertically at the midpoint of a flip. */
@@ -94,6 +96,10 @@ export class CardView extends Phaser.GameObjects.Sprite {
   private pendingFrame: number | null = null;
   /** Resolves the promise of an in-flight move; see `moveTo` and `settle`. */
   private arrival: (() => void) | null = null;
+  /** 0 = normal, 1 = fully greyed out (a locked card). */
+  private dimValue = 0;
+  private dimTarget = 0;
+  private dimTween?: Phaser.Tweens.Tween;
 
   public constructor(
     scene: Phaser.Scene,
@@ -106,6 +112,36 @@ export class CardView extends Phaser.GameObjects.Sprite {
   }
 
   // Tweened properties -------------------------------------------------------
+
+  public get dimAmount(): number {
+    return this.dimValue;
+  }
+
+  public set dimAmount(value: number) {
+    this.dimValue = value;
+    if (value <= 0) {
+      this.clearTint();
+      return;
+    }
+    const level = Math.round(255 - (255 - LOCKED_GREY) * value);
+    this.setTint((level << 16) | (level << 8) | level);
+  }
+
+  /** Greys the card out while it can't be played (or brings it back). */
+  public setDimmed(dimmed: boolean, animate: boolean): void {
+    const target = dimmed ? 1 : 0;
+    if (target === this.dimTarget && (this.dimValue === target || this.dimTween?.isPlaying())) {
+      return;
+    }
+    this.dimTarget = target;
+    this.dimTween?.stop();
+    this.dimTween = undefined;
+    if (!animate) {
+      this.dimAmount = target;
+      return;
+    }
+    this.dimTween = this.scene.tweens.add({ targets: this, dimAmount: target, duration: 220, ease: "Sine.easeOut" });
+  }
 
   public get liftAmount(): number {
     return this.liftValue;
@@ -164,6 +200,8 @@ export class CardView extends Phaser.GameObjects.Sprite {
     // caller awaiting this card's arrival must be released explicitly.
     this.resolveArrival();
     this.scene.tweens.killTweensOf(this);
+    this.dimTween = undefined;
+    this.dimAmount = this.dimTarget;
     this.pendingFrame = null;
     this.flipValue = 1;
     this.setFrame(this.frameForFace());

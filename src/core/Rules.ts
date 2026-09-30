@@ -60,6 +60,15 @@ export abstract class Rules {
   /** May the cards of `from` starting at `index` be placed onto `to`? */
   public abstract canDrop(board: Board, from: number, index: number, to: number): boolean;
 
+  /**
+   * Is this face-up card stuck where it is (the table greys these out)?
+   * By default: it can't be picked up now. Games where picking up also
+   * depends on passing limits (FreeCell's free cells) refine this.
+   */
+  public isLocked(board: Board, pile: number, index: number): boolean {
+    return !this.canPick(board, pile, index);
+  }
+
   /** Whether tapping the stock currently does anything. */
   public canDraw(_board: Board): boolean {
     return false;

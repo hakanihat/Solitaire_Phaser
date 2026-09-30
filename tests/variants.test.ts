@@ -148,3 +148,21 @@ describe("tap to move", async () => {
     }
   });
 });
+
+describe("locked cards", () => {
+  it("never greys out a card the player can pick up", () => {
+    for (const variant of VARIANTS) {
+      for (const difficulty of DIFFICULTIES) {
+        const rules = variant.createRules(difficulty);
+        const board = rules.deal(12345);
+        board.piles.forEach((pile, p) =>
+          pile.forEach((_, i) => {
+            if (rules.canPick(board, p, i)) {
+              expect(rules.isLocked(board, p, i), `${variant.id}/${difficulty} pile ${p} card ${i}`).toBe(false);
+            }
+          })
+        );
+      }
+    }
+  });
+});

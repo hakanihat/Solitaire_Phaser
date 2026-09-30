@@ -64,6 +64,10 @@ export class FreeCellRules extends Rules {
     return (freeCells + 1) * 2 ** Math.max(0, emptyColumns - (toEmptyColumn ? 1 : 0));
   }
 
+  public override isLocked(board: Board, pile: number, index: number): boolean {
+    return this.kindOf(pile) === PileKind.Tableau && !isRun(this, board, pile, index, alternateColorsDown);
+  }
+
   public canPick(board: Board, pile: number, index: number): boolean {
     const count = board.piles[pile].length - index;
     switch (this.kindOf(pile)) {

@@ -130,6 +130,7 @@ export class GameScene extends Phaser.Scene {
       this.settings.leftHanded,
       this.variant.theme.accent
     );
+    this.boardView.setDimLocked(this.settings.dimLocked);
 
     if (resuming) {
       this.afterBoardChange();
@@ -959,6 +960,7 @@ export class GameScene extends Phaser.Scene {
           this.variant.theme.accent
         );
       }
+      this.boardView.setDimLocked(settings.dimLocked);
     });
   }
 

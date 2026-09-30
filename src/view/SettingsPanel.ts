@@ -7,6 +7,7 @@ const OPTIONS: readonly { key: keyof Settings; label: string }[] = [
   { key: "sound", label: "Sound effects" },
   { key: "tapToMove", label: "Tap a card to move it" },
   { key: "autoFoundation", label: "Auto-play safe cards home" },
+  { key: "dimLocked", label: "Grey out locked cards" },
   { key: "leftHanded", label: "Left-handed layout" },
   { key: "showTimer", label: "Show timer" },
   { key: "vibration", label: "Vibration" },
